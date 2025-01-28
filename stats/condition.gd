@@ -1,6 +1,9 @@
 extends Resource
 
-## Condition resource for evaluating conditions based on stat values.
+## Condition resource for evaluating conditions based on stat values.[br]
+## if ref_stat1_name is not set, the condition will use the value property for comparison.[br]
+## if ref_stat2_name is not set, the condition will use the value property for comparison.[br]
+## if both ref_stat1_name and ref_stat2_name are not set, the condition will always return false.
 class_name Condition
 # TODO: Add support for multiple reference stats
 
@@ -139,7 +142,7 @@ func _remove_connections() -> void:
 ## Initializes the condition with the given parent object.[br]
 ## [param parent]: The parent object to retrieve stats from.
 func init_stat(parent: RefCounted) -> void:
-    if parent == null: return
+    if parent == null or !parent.has_method("get_stat"): return
     if _ref_stat1 != null or _ref_stat2 != null: return
     _ref_stat1 = parent.get_stat(_ref_stat1_name)
     _ref_stat2 = parent.get_stat(_ref_stat2_name)
@@ -149,7 +152,6 @@ func init_stat(parent: RefCounted) -> void:
         if _expression.parse(_math_expression, ["value1", "value2"]) != OK:
             push_error("Error parsing condition math expression: " + _math_expression)
     _current_condition = _evaluate_condition()
-    condition_changed.emit(_current_condition)
 
 ## Cleans up connections and resets internal state.
 func uninit_stat() -> void:

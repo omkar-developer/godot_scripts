@@ -1,5 +1,6 @@
 extends Resource
 
+#TODO: also add signal based system for stat changes
 ## A class that represents a set of stat _modifiers and provides methods to manage and apply them.
 class_name StatModifierSet
 
@@ -31,6 +32,23 @@ func _init(modifier_name := "", _process_every_frame := false, group := "") -> v
     _group = group
     process = _process_every_frame
 
+## Called when the condition state changes
+func _on_condition_changed(result: bool) -> void:
+    if result:
+        _apply_effect()
+    else:
+        _remove_effect()
+
+## Connects condition signals and handles initial state
+func _connect_condition() -> void:
+    if condition != null and not condition.condition_changed.is_connected(_on_condition_changed):
+        condition.condition_changed.connect(_on_condition_changed)
+
+## Disconnects condition signals
+func _disconnect_condition() -> void:
+    if condition != null and condition.condition_changed.is_connected(_on_condition_changed):
+        condition.condition_changed.disconnect(_on_condition_changed)
+
 ## Merges a parallel StatModifierSet into this one.[br]
 ## [param modifer_set]: The StatModifierSet to merge.
 func _merge_parellel(modifer_set: StatModifierSet) -> void:
@@ -50,7 +68,8 @@ func merge_mod(mod: StatModifierSet) -> void:
 func set_mod_value(mod_idx: int, value: float) -> void:
     if _modifiers.size() > mod_idx:
         _modifiers[mod_idx].set_value(value)
-
+    else:
+        push_error("Invalid modifier index: " + str(mod_idx))
 
 ## Finds a modifier in this set that matches the given modifier.[br]
 ## [param mod]: The modifier to find.[br]
@@ -98,20 +117,36 @@ func init_modifiers(parent: RefCounted) -> void:
     _parent = parent
     for mod in _modifiers:
         mod.init_stat(parent)
-    if _apply: _apply_effect()
+    # Initialize condition first
+    if condition != null:
+        condition.init_stat(parent)
+        _connect_condition()
+        if condition._current_condition:
+            _apply_effect()
+    # Apply effects
+    if _apply and condition == null:
+        _apply_effect()
 
 ## Uninitializes all _modifiers in this set.
 func uninit_modifiers() -> void:
+    if condition != null:
+        _disconnect_condition()
+        condition.uninit_stat()
     _parent = null
     for mod in _modifiers:
         mod.uninit_stat(_remove_all)
 
 ## Adds a modifier to this set.[br]
 ## [param mod]: The modifier to add.
-func add_modifier(mod: StatModifier) -> void:
-    _modifiers.append(mod.duplicate(true))
-    mod.init_stat(_parent)
-    if _apply: mod.apply()
+func add_modifier(mod: StatModifier) -> StatModifier:
+    if _marked_for_deletion or _parent == null: return null
+    var mod2 = mod.duplicate(true)
+    _modifiers.append(mod2)
+    mod2.init_stat(_parent)
+    # Only apply if conditions are met
+    if (_apply and condition == null) or (condition != null and condition._current_condition):
+        mod2.apply()
+    return mod2
 
 ## Removes a modifier from this set.[br]
 ## [param mod]: The modifier to remove.
@@ -122,20 +157,51 @@ func remove_modifier(mod: StatModifier) -> void:
     _modifiers.erase(mod2)
 
 ## Clears all _modifiers in this set.
-func clear_modifiers() -> void:
+func clear_modifiers() -> void:    
     for mod in _modifiers:
         mod.uninit_stat(_remove_all)
     _modifiers.clear()
 
 ## Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(_delta: float) -> void:
-    pass
+func _process(delta: float) -> void:
+    if condition != null and process:
+        condition._process(delta)
     
 ## Deletes this modifier set.
 func delete() -> void:
+    process = false
+    if condition != null:
+        _disconnect_condition()
+        condition.uninit_stat()
     clear_modifiers()
     _marked_for_deletion = true
 
 ## Returns true if this modifier set is marked for deletion, false otherwise.
 func is_marked_for_deletion() -> bool:
     return _marked_for_deletion
+
+## Returns a dictionary representation of this modifier set.
+func to_dict() -> Dictionary:
+    return {
+        "modifiers": _modifiers.map(func(m): return m.to_dict()),
+        "modifier_name": _modifier_name,
+        "group": _group,
+        "process": process,
+        "condition": condition.to_dict() if condition else null,
+    }
+
+## Loads this modifier set from a dictionary.
+func from_dict(data: Dictionary) -> void:
+    _modifiers = data.get("modifiers", []).map(
+        func(m_data): 
+            var m = StatModifier.new()
+            m.from_dict(m_data)
+            return m
+    )
+    _modifier_name = data.get("modifier_name", "")
+    _group = data.get("group", "")
+    process = data.get("process", false)
+
+    if data.get("condition", null):
+        condition = Condition.new()
+        condition.from_dict(data["condition"])
