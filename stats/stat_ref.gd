@@ -6,7 +6,7 @@ class_name StatRef
 var _stat : Stat
 var _connection : Callable
 
-func init_stat(parent: RefCounted, connection_function: Callable) -> void:
+func init_stat(parent: Object, connection_function: Callable) -> void:
     if parent == null: return
     if _stat != null: return
     _stat = parent.get_stat(_stat_name)

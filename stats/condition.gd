@@ -141,7 +141,7 @@ func _remove_connections() -> void:
 
 ## Initializes the condition with the given parent object.[br]
 ## [param parent]: The parent object to retrieve stats from.
-func init_stat(parent: RefCounted) -> void:
+func init_stat(parent: Object) -> void:
     if parent == null or !parent.has_method("get_stat"): return
     if _ref_stat1 != null or _ref_stat2 != null: return
     _ref_stat1 = parent.get_stat(_ref_stat1_name)

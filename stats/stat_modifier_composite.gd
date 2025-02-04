@@ -127,7 +127,7 @@ func _update_value() -> void:
         update()
 
 ## initialize the stat
-func init_stat(parent: RefCounted) -> void:
+func init_stat(parent: Object) -> void:
     super.init_stat(parent)
     if parent == null or _ref_stat != null or _stats != null or _stats.size() > 0: return
     if _math_expression != "":

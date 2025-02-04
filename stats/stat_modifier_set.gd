@@ -18,14 +18,25 @@ class_name StatModifierSet
 
 ## The condition associated with this modifier set.
 @export var condition: Condition
+@export var condition_apply_on_start := true
+@export var condition_pause_process := false
+
+@export var apply_on_condition_change := true
+@export var remove_on_condition_change := true
 
 var _marked_for_deletion := false
 
 ## The _parent object associated with this modifier set.
-var _parent: RefCounted
+var _parent: Object
 
 var _apply := true
 var _remove_all := true
+
+func _is_codition_apply_on_start() -> bool:
+    return condition_apply_on_start
+
+func _is_condition_pause_process() -> bool:
+    return condition_pause_process
 
 func _init(modifier_name := "", _process_every_frame := false, group := "") -> void:
     _modifier_name = modifier_name
@@ -35,9 +46,11 @@ func _init(modifier_name := "", _process_every_frame := false, group := "") -> v
 ## Called when the condition state changes
 func _on_condition_changed(result: bool) -> void:
     if result:
-        _apply_effect()
+        if apply_on_condition_change: _apply_effect()
+        if _is_condition_pause_process(): process = true
     else:
-        _remove_effect()
+        if remove_on_condition_change: _remove_effect()
+        if _is_condition_pause_process(): process = false
 
 ## Connects condition signals and handles initial state
 func _connect_condition() -> void:
@@ -111,7 +124,7 @@ func _remove_effect() -> void:
 
 ## Initializes all _modifiers in this set with the given _parent.[br]
 ## [param _parent]: The _parent to initialize the _modifiers with.
-func init_modifiers(parent: RefCounted) -> void:
+func init_modifiers(parent: Object) -> void:
     if parent == null: return
     if not parent.has_method("get_stat"): return
     _parent = parent
@@ -121,7 +134,7 @@ func init_modifiers(parent: RefCounted) -> void:
     if condition != null:
         condition.init_stat(parent)
         _connect_condition()
-        if condition._current_condition:
+        if condition._current_condition and _is_codition_apply_on_start():
             _apply_effect()
     # Apply effects
     if _apply and condition == null:
@@ -144,7 +157,7 @@ func add_modifier(mod: StatModifier) -> StatModifier:
     _modifiers.append(mod2)
     mod2.init_stat(_parent)
     # Only apply if conditions are met
-    if (_apply and condition == null) or (condition != null and condition._current_condition):
+    if (_apply and condition == null) or (condition != null and condition._current_condition and _is_codition_apply_on_start()):
         mod2.apply()
     return mod2
 
@@ -164,7 +177,7 @@ func clear_modifiers() -> void:
 
 ## Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta: float) -> void:
-    if condition != null and process:
+    if condition != null:
         condition._process(delta)
     
 ## Deletes this modifier set.

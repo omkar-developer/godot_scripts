@@ -9,12 +9,15 @@ signal modifier_removed(modifier_name: String, modifier: StatModifierSet)
 ## Dictionary of active modifiers
 var _active_modifiers: Dictionary = {}
 ## Parent entity reference
-var _parent: RefCounted
+var _parent: Object
 ## Array of attached modules
 var _modules: Array[BMModule] = []
 
-func _init(parent: RefCounted) -> void:
-    _parent = parent
+func _init(parent: Object = null) -> void:
+    if parent == null:
+        _parent = get_parent()
+    else:
+        _parent = parent
 
 ## Add a module to the manager
 func add_module(module: BMModule) -> void:
@@ -40,7 +43,10 @@ func apply_modifier(modifier: StatModifierSet) -> bool:
     
     # Initialize and store modifier
     modifier.init_modifiers(_parent)
-    _active_modifiers[modifier_name] = modifier
+    if has_modifier(modifier_name):
+        _active_modifiers[modifier_name].merge_mod(modifier)
+    else:
+        _active_modifiers[modifier_name] = modifier
     
     # Let modules handle post-application
     for module in _modules:

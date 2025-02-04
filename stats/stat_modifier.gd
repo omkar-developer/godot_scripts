@@ -41,7 +41,7 @@ func _init(stat_name: String = "", type: StatModifierType = StatModifierType.FLA
 
 ## Initializes the _stat reference by fetching it from the provided _parent.[br]
 ## [param _parent]: The node to fetch the _stat from.
-func init_stat(_parent: RefCounted) -> void:
+func init_stat(_parent: Object) -> void:
     if _parent == null or _stat != null: return
     _stat = _parent.get_stat(_stat_name)
 

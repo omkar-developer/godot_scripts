@@ -31,6 +31,12 @@ var ticks := 0
 var merge_function: Callable
 var running := false
 
+func _is_codition_apply_on_start() -> bool:
+    return false
+
+func _is_condition_pause_process() -> bool:
+    return true
+
 func _init(modifier_name := "", _process_every_frame := false, group := "", _apply_at_start := true, _interval := 0.0, _minimum_interval := 0.0, _maximum_interval := 3600.0, _duration := 0.0, _total_ticks := 0, _merge_type := 3, _remove_effect_on_finish := true, _merge_function := Callable()) -> void:
     super._init(modifier_name, _process_every_frame, group)
     apply_at_start = _apply_at_start
