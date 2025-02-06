@@ -13,13 +13,14 @@ class_name StatModifierSet
 ## The group to which this modifier set belongs.
 @export var _group := ""
 
+## Whether to merge modifiers with the same name.
+@export var merge_enabled := true
+
 ## Whether to process this modifier set every frame.
 @export var process := false
 
 ## The condition associated with this modifier set.
 @export var condition: Condition
-@export var condition_apply_on_start := true
-@export var condition_pause_process := false
 
 @export var apply_on_condition_change := true
 @export var remove_on_condition_change := true
@@ -31,190 +32,207 @@ var _parent: Object
 
 var _apply := true
 var _remove_all := true
+var _condition_apply_on_start := true
+var _condition_pause_process := false
 
-func _is_codition_apply_on_start() -> bool:
-    return condition_apply_on_start
-
-func _is_condition_pause_process() -> bool:
-    return condition_pause_process
+func get_modifier_name() -> String:
+	return _modifier_name
 
 func _init(modifier_name := "", _process_every_frame := false, group := "") -> void:
-    _modifier_name = modifier_name
-    _group = group
-    process = _process_every_frame
+	_modifier_name = modifier_name
+	_group = group
+	process = _process_every_frame
 
 ## Called when the condition state changes
 func _on_condition_changed(result: bool) -> void:
-    if result:
-        if apply_on_condition_change: _apply_effect()
-        if _is_condition_pause_process(): process = true
-    else:
-        if remove_on_condition_change: _remove_effect()
-        if _is_condition_pause_process(): process = false
+	if result:
+		if apply_on_condition_change: _apply_effect()
+		if _condition_pause_process: process = true
+	else:
+		if remove_on_condition_change: _remove_effect()
+		if _condition_pause_process: process = false
 
 ## Connects condition signals and handles initial state
 func _connect_condition() -> void:
-    if condition != null and not condition.condition_changed.is_connected(_on_condition_changed):
-        condition.condition_changed.connect(_on_condition_changed)
+	if condition != null and not condition.condition_changed.is_connected(_on_condition_changed):
+		condition.condition_changed.connect(_on_condition_changed)
 
 ## Disconnects condition signals
 func _disconnect_condition() -> void:
-    if condition != null and condition.condition_changed.is_connected(_on_condition_changed):
-        condition.condition_changed.disconnect(_on_condition_changed)
+	if condition != null and condition.condition_changed.is_connected(_on_condition_changed):
+		condition.condition_changed.disconnect(_on_condition_changed)
 
 ## Merges a parallel StatModifierSet into this one.[br]
 ## [param modifer_set]: The StatModifierSet to merge.
 func _merge_parellel(modifer_set: StatModifierSet) -> void:
-    if _modifiers.size() != modifer_set._modifiers.size(): return
-    for i in range(modifer_set._modifiers.size() - 1, -1, -1):
-        if modifer_set._modifiers[i].is_equal(_modifiers[i]):
-            _modifiers[i].merge(modifer_set._modifiers[i])
+	if _modifiers.size() != modifer_set._modifiers.size(): return
+	for i in range(modifer_set._modifiers.size() - 1, -1, -1):
+		if modifer_set._modifiers[i].is_equal(_modifiers[i]):
+			_modifiers[i].merge(modifer_set._modifiers[i])
 
 ## Merges a StatModifierSet into this one.[br]
 ## [param mod]: The StatModifierSet to merge.
 func merge_mod(mod: StatModifierSet) -> void:
-    _merge_parellel(mod)
+	if not merge_enabled: return
+	_merge_parellel(mod)
 
 ## Sets the value of a modifier at a given index.[br]
 ## [param mod_idx]: The index of the modifier to set the value of.[br]
 ## [param value]: The value to set.
 func set_mod_value(mod_idx: int, value: float) -> void:
-    if _modifiers.size() > mod_idx:
-        _modifiers[mod_idx].set_value(value)
-    else:
-        push_error("Invalid modifier index: " + str(mod_idx))
+	if _modifiers.size() > mod_idx:
+		_modifiers[mod_idx].set_value(value)
+	else:
+		push_error("Invalid modifier index: " + str(mod_idx))
 
 ## Finds a modifier in this set that matches the given modifier.[br]
 ## [param mod]: The modifier to find.[br]
 ## [return]: The modifier that matches the given modifier, or null if no such modifier is found.
 func find_mod(mod: StatModifier) -> StatModifier:
-    for mod2 in _modifiers:
-        if mod.is_equal(mod2):
-            return mod2
-    return null
+	for mod2 in _modifiers:
+		if mod.is_equal(mod2):
+			return mod2
+	return null
 
 ## Finds a modifier that targets a given stat and has a given type.[br]
 ## [param stat_name]: The name of the stat to target.[br]
 ## [param type]: The type of the modifier to find.[br]
 ## [return]: The modifier that targets the given stat and has the given type, or null if no such modifier is found.
 func find_mod_by_name_and_type(stat_name: String, type: StatModifier.StatModifierType) -> StatModifier:
-    for mod in _modifiers:
-        if mod.stat_name == stat_name and mod.type == type:
-            return mod
-    return null
+	for mod in _modifiers:
+		if mod.stat_name == stat_name and mod.type == type:
+			return mod
+	return null
 
 ## Finds a modifier that targets a given stat.[br]
 ## [param stat_name]: The name of the stat to target.[br]
 ## [return]: The modifier that targets the given stat, or null if no such modifier is found.
 func find_mod_for_stat(stat_name: String) -> StatModifier:
-    for mod in _modifiers:
-        if mod.stat_name == stat_name:
-            return mod
-    return null
+	for mod in _modifiers:
+		if mod.stat_name == stat_name:
+			return mod
+	return null
 
 ## Applies all _modifiers in this set to the _parent.
 func _apply_effect() -> void:
-    for mod in _modifiers:
-        mod.apply()
+	for mod in _modifiers:
+		mod.apply()
 
 ## Removes all _modifiers in this set from the _parent.
 func _remove_effect() -> void:
-    for mod in _modifiers:
-        mod.remove_all()
+	for mod in _modifiers:
+		mod.remove_all()
 
 ## Initializes all _modifiers in this set with the given _parent.[br]
 ## [param _parent]: The _parent to initialize the _modifiers with.
 func init_modifiers(parent: Object) -> void:
-    if parent == null: return
-    if not parent.has_method("get_stat"): return
-    _parent = parent
-    for mod in _modifiers:
-        mod.init_stat(parent)
-    # Initialize condition first
-    if condition != null:
-        condition.init_stat(parent)
-        _connect_condition()
-        if condition._current_condition and _is_codition_apply_on_start():
-            _apply_effect()
-    # Apply effects
-    if _apply and condition == null:
-        _apply_effect()
+	if parent == null: return
+	if not parent.has_method("get_stat"): return
+	_parent = parent
+	for mod in _modifiers:
+		mod.init_stat(parent)
+	# Initialize condition first
+	if condition != null:
+		condition.init_stat(parent)
+		_connect_condition()
+		if condition._current_condition and _condition_apply_on_start:
+			_apply_effect()
+	# Apply effects
+	if _apply and condition == null:
+		_apply_effect()
 
 ## Uninitializes all _modifiers in this set.
 func uninit_modifiers() -> void:
-    if condition != null:
-        _disconnect_condition()
-        condition.uninit_stat()
-    _parent = null
-    for mod in _modifiers:
-        mod.uninit_stat(_remove_all)
+	if condition != null:
+		_disconnect_condition()
+		condition.uninit_stat()
+	_parent = null
+	for mod in _modifiers:
+		mod.uninit_stat(_remove_all)
 
 ## Adds a modifier to this set.[br]
 ## [param mod]: The modifier to add.
 func add_modifier(mod: StatModifier) -> StatModifier:
-    if _marked_for_deletion or _parent == null: return null
-    var mod2 = mod.duplicate(true)
-    _modifiers.append(mod2)
-    mod2.init_stat(_parent)
-    # Only apply if conditions are met
-    if (_apply and condition == null) or (condition != null and condition._current_condition and _is_codition_apply_on_start()):
-        mod2.apply()
-    return mod2
+	if _marked_for_deletion or _parent == null: return null
+	var mod2 = mod.duplicate(true)
+	_modifiers.append(mod2)
+	mod2.init_stat(_parent)
+	# Only apply if conditions are met
+	if (_apply and condition == null) or (condition != null and condition._current_condition and _condition_apply_on_start):
+		mod2.apply()
+	return mod2
 
 ## Removes a modifier from this set.[br]
 ## [param mod]: The modifier to remove.
 func remove_modifier(mod: StatModifier) -> void:
-    var mod2 = find_mod(mod)
-    if mod2 == null: return
-    mod2.uninit_stat(_remove_all)
-    _modifiers.erase(mod2)
+	var mod2 = find_mod(mod)
+	if mod2 == null: return
+	mod2.uninit_stat(_remove_all)
+	_modifiers.erase(mod2)
 
 ## Clears all _modifiers in this set.
 func clear_modifiers() -> void:    
-    for mod in _modifiers:
-        mod.uninit_stat(_remove_all)
-    _modifiers.clear()
+	for mod in _modifiers:
+		mod.uninit_stat(_remove_all)
+	_modifiers.clear()
 
 ## Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta: float) -> void:
-    if condition != null:
-        condition._process(delta)
-    
+	if condition != null:
+		condition._process(delta)
+	
 ## Deletes this modifier set.
 func delete() -> void:
-    process = false
-    if condition != null:
-        _disconnect_condition()
-        condition.uninit_stat()
-    clear_modifiers()
-    _marked_for_deletion = true
+	process = false
+	if condition != null:
+		_disconnect_condition()
+		condition.uninit_stat()
+	clear_modifiers()
+	_marked_for_deletion = true
 
 ## Returns true if this modifier set is marked for deletion, false otherwise.
 func is_marked_for_deletion() -> bool:
-    return _marked_for_deletion
+	return _marked_for_deletion
+
+## Make copy of this modifier set
+func copy() -> StatModifierSet:
+	var mod_set = StatModifierSet.new(_modifier_name, process, _group)
+	for mod in _modifiers:
+		mod_set._modifiers.append(mod.copy())
+	mod_set.condition = condition.duplicate(true) if condition else null    
+	mod_set.process = process
+	mod_set._marked_for_deletion = _marked_for_deletion
+	mod_set._group = _group
+	mod_set._remove_all = _remove_all
+	mod_set.merge_enabled = merge_enabled
+	mod_set._condition_apply_on_start = _condition_apply_on_start
+	mod_set._condition_pause_process = _condition_pause_process
+	mod_set.apply_on_condition_change = apply_on_condition_change
+	mod_set.remove_on_condition_change = remove_on_condition_change
+	return mod_set
 
 ## Returns a dictionary representation of this modifier set.
 func to_dict() -> Dictionary:
-    return {
-        "modifiers": _modifiers.map(func(m): return m.to_dict()),
-        "modifier_name": _modifier_name,
-        "group": _group,
-        "process": process,
-        "condition": condition.to_dict() if condition else null,
-    }
+	return {
+		"modifiers": _modifiers.map(func(m): return m.to_dict()),
+		"modifier_name": _modifier_name,
+		"group": _group,
+		"process": process,
+		"condition": condition.to_dict() if condition else null,
+	}
 
 ## Loads this modifier set from a dictionary.
 func from_dict(data: Dictionary) -> void:
-    _modifiers = data.get("modifiers", []).map(
-        func(m_data): 
-            var m = StatModifier.new()
-            m.from_dict(m_data)
-            return m
-    )
-    _modifier_name = data.get("modifier_name", "")
-    _group = data.get("group", "")
-    process = data.get("process", false)
+	_modifiers = data.get("modifiers", []).map(
+		func(m_data): 
+			var m = StatModifier.new()
+			m.from_dict(m_data)
+			return m
+	)
+	_modifier_name = data.get("modifier_name", "")
+	_group = data.get("group", "")
+	process = data.get("process", false)
 
-    if data.get("condition", null):
-        condition = Condition.new()
-        condition.from_dict(data["condition"])
+	if data.get("condition", null):
+		condition = Condition.new()
+		condition.from_dict(data["condition"])

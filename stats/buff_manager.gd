@@ -13,11 +13,9 @@ var _parent: Object
 ## Array of attached modules
 var _modules: Array[BMModule] = []
 
-func _init(parent: Object = null) -> void:
-    if parent == null:
+func _enter_tree() -> void:
+    if _parent == null:
         _parent = get_parent()
-    else:
-        _parent = parent
 
 ## Add a module to the manager
 func add_module(module: BMModule) -> void:
@@ -33,19 +31,20 @@ func remove_module(module: BMModule) -> void:
 
 ## Apply a modifier
 ## Returns true if successfully applied
-func apply_modifier(modifier: StatModifierSet) -> bool:
+func apply_modifier(_modifier: StatModifierSet) -> bool:
+    var modifier = _modifier.copy()
     # Let modules handle pre-application
     for module in _modules:
         if not module.on_before_apply(modifier):
             return false
     
-    var modifier_name = modifier.modifier_name
+    var modifier_name = modifier.get_modifier_name()
     
-    # Initialize and store modifier
-    modifier.init_modifiers(_parent)
+    # Initialize and store modifier    
     if has_modifier(modifier_name):
         _active_modifiers[modifier_name].merge_mod(modifier)
     else:
+        modifier.init_modifiers(_parent)
         _active_modifiers[modifier_name] = modifier
     
     # Let modules handle post-application
@@ -96,10 +95,11 @@ func _process(delta: float) -> void:
     # Update modifiers
     for modifier_name in _active_modifiers:
         var modifier = _active_modifiers[modifier_name]
-        if modifier is StatModifierSetTimed:
+        if modifier.is_marked_for_deletion():
+            to_remove.append(modifier_name)
+            continue
+        elif modifier.process:
             modifier._process(delta)
-            if modifier.is_marked_for_deletion():
-                to_remove.append(modifier_name)
     
     # Update modules
     for module in _modules:

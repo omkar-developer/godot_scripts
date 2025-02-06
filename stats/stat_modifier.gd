@@ -1,5 +1,6 @@
 extends Resource
 
+#TODO: Predict future value if modifier_applied
 ## Class for managing _stat modifications.
 class_name StatModifier
 
@@ -25,6 +26,11 @@ enum StatModifierType {
 ## The maximum number of times this modifier can be applied.[br]
 ## A value of -1 means it can be applied indefinitely.
 @export var max_apply_count: int = -1
+
+## If true, only applies the modifier if it's between the min and max limits.
+@export var apply_only_if_between_limit := false
+@export var min_limit := 0
+@export var max_limit := 100
 
 ## The _stat instance this modifier is linked to.
 var _stat: Stat
@@ -103,16 +109,28 @@ func apply(multiplier := 1) -> void:
     if not can_apply(multiplier): return
     match _type:
         StatModifierType.FLAT:
+            if apply_only_if_between_limit:
+                if _stat.flat_modifier + _value * multiplier < min_limit or _stat.flat_modifier + _value * multiplier > max_limit: return
             _stat.flat_modifier += _value * multiplier
         StatModifierType.PERCENT:
+            if apply_only_if_between_limit:
+                if _stat.percent_modifier + _value * multiplier < min_limit or _stat.percent_modifier + _value * multiplier > max_limit: return
             _stat.percent_modifier += _value * multiplier
         StatModifierType.VALUE:
+            if apply_only_if_between_limit:
+                if _stat.base_value + _value * multiplier < min_limit or _stat.base_value + _value * multiplier > max_limit: return
             _stat.base_value += _value * multiplier
         StatModifierType.MAX_VALUE:
+            if apply_only_if_between_limit:
+                if _stat.max_value + _value * multiplier < min_limit or _stat.max_value + _value * multiplier > max_limit: return
             _stat.max_value += _value * multiplier
         StatModifierType.MAX_FLAT:
+            if apply_only_if_between_limit:
+                if _stat.max_flat_modifier + _value * multiplier < min_limit or _stat.max_flat_modifier + _value * multiplier > max_limit: return
             _stat.max_flat_modifier += _value * multiplier
         StatModifierType.MAX_PERCENT:
+            if apply_only_if_between_limit:
+                if _stat.max_percent_modifier + _value * multiplier < min_limit or _stat.max_percent_modifier + _value * multiplier > max_limit: return
             _stat.max_percent_modifier += _value * multiplier
     _apply_count += (1 * multiplier)
 
@@ -122,16 +140,28 @@ func remove(multiplier := 1) -> void:
     if not is_applied(multiplier): return
     match _type:
         StatModifierType.FLAT:
+            if apply_only_if_between_limit:
+                if _stat.flat_modifier - _value * multiplier < min_limit or _stat.flat_modifier - _value * multiplier > max_limit: return
             _stat.flat_modifier -= _value * multiplier
         StatModifierType.PERCENT:
+            if apply_only_if_between_limit:
+                if _stat.percent_modifier - _value * multiplier < min_limit or _stat.percent_modifier - _value * multiplier > max_limit: return
             _stat.percent_modifier -= _value * multiplier
         StatModifierType.VALUE:
+            if apply_only_if_between_limit:
+                if _stat.base_value - _value * multiplier < min_limit or _stat.base_value - _value * multiplier > max_limit: return
             _stat.base_value -= _value * multiplier
         StatModifierType.MAX_VALUE:
+            if apply_only_if_between_limit:
+                if _stat.max_value - _value * multiplier < min_limit or _stat.max_value - _value * multiplier > max_limit: return
             _stat.max_value -= _value * multiplier
         StatModifierType.MAX_FLAT:
+            if apply_only_if_between_limit:
+                if _stat.max_flat_modifier - _value * multiplier < min_limit or _stat.max_flat_modifier - _value * multiplier > max_limit: return
             _stat.max_flat_modifier -= _value * multiplier
         StatModifierType.MAX_PERCENT:
+            if apply_only_if_between_limit:
+                if _stat.max_percent_modifier - _value * multiplier < min_limit or _stat.max_percent_modifier - _value * multiplier > max_limit: return
             _stat.max_percent_modifier -= _value * multiplier
     _apply_count -= (1 * multiplier)
 
@@ -154,3 +184,27 @@ func get_value() -> float:
 ## Returns the number of times this modifier has been applied.
 func get_apply_count() -> int:
     return _apply_count
+
+## Print debug values
+func _to_string() -> String:
+    return "StatModifier: " + _stat_name + " " + str(_type) + " " + str(_value)
+
+## Returns a duplicate copy of this modifier.
+func copy() -> StatModifier:
+    return duplicate(true)
+
+## Returns a dictionary representation of this modifier.
+func to_dict() -> Dictionary:
+    return {
+        "stat_name": _stat_name,
+        "type": _type,
+        "value": _value,
+        "apply_count": _apply_count
+    }
+
+## Loads this modifier from a dictionary.
+func from_dict(dict: Dictionary) -> void:
+    _stat_name = dict["stat_name"]
+    _type = dict["type"]
+    _value = dict["value"]
+    _apply_count = dict["apply_count"]

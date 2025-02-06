@@ -90,12 +90,14 @@ func on_value_changed() -> void:
         value_changed.emit()
 
 ## Constructor
-func _init(_base_value = 0.0, _clamped = true, _min_value = 0.0, _max_value = 100.0, _clamped_modifier = false, _max_percent_modifier = 0.0, _max_flat_modifier = 0.0) -> void:
+func _init(_base_value = 0.0, _clamped = true, _min_value = 0.0, _max_value = 100.0, _clamped_modifier = false, _flat_modifier = 0.0, _percent_modifier = 0.0, _max_percent_modifier = 0.0, _max_flat_modifier = 0.0) -> void:
     self.clamped = _clamped
     self.clamped_modifier = _clamped_modifier
     self.base_value = _base_value
     self.min_value = _min_value
     self.max_value = _max_value
+    self.percent_modifier = _percent_modifier
+    self.flat_modifier = _flat_modifier
     self.max_percent_modifier = _max_percent_modifier
     self.max_flat_modifier = _max_flat_modifier
 
