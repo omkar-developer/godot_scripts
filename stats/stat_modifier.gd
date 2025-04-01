@@ -24,13 +24,14 @@ enum StatModifierType {
 @export var _value: float
 
 ## Whether this modifier should only be applied once.
-@export var _apply_only_once := false
+@export var _apply_only_once := true
 
 ## The stat instance this modifier is linked to.
 var _stat: Stat
 
 ## Is this modifier currently applied
 var _is_applied := false
+var _applied_value := 0.0
 
 ## Initializes the modifier with the provided stat name, type, and value.
 func _init(stat_name: String = "", type: StatModifierType = StatModifierType.FLAT, value: float = 0.0) -> void:
@@ -41,8 +42,21 @@ func _init(stat_name: String = "", type: StatModifierType = StatModifierType.FLA
 ## Initializes the stat reference by fetching it from the provided parent.
 ## [param parent]: The node to fetch the stat from.
 func init_stat(parent: Object) -> void:
-    if parent == null or _stat != null: return
+    if parent == null:
+        push_error("Cannot initialize stat with null parent")
+        return
+        
+    if _stat != null: 
+        return
+        
+    if not parent.has_method("get_stat"):
+        push_error("Parent object doesn't have get_stat method")
+        return
+        
     _stat = parent.get_stat(_stat_name)
+    
+    if _stat == null:
+        push_warning("Could not find stat named '%s' in parent" % _stat_name)
 
 ## Clears the stat reference to uninitialize the modifier.
 func uninit_stat() -> void:
@@ -51,8 +65,17 @@ func uninit_stat() -> void:
 
 ## Merges another modifier into this one by adding its value to this modifier's value.
 ## [param mod]: The modifier to merge.
-func merge(mod: StatModifier) -> void:
+## [return]: Whether the merge was successful.
+func merge(mod: StatModifier) -> bool:
+    if mod == null:
+        return false
+        
+    if _type != mod._type or _stat_name != mod._stat_name:
+        push_warning("Attempting to merge modifiers of different types or stats")
+        return false
+        
     set_value(_value + mod._value)
+    return true
 
 ## Checks if another modifier is equivalent to this one (same type and stat name).
 ## [param mod]: The modifier to compare.
@@ -111,27 +134,29 @@ func apply() -> float:
             actual_change = _stat.add_max_value(_value)
 
     _is_applied = true
+    _applied_value = actual_change
     return actual_change
 
 ## Removes the modifier from the stat and returns the actual amount removed
 func remove() -> float:
+    if not _apply_only_once: return 0.0
     if not is_valid(): return 0.0
     if not _is_applied: return 0.0
     
     var actual_change = 0.0
     match _type:
         StatModifierType.FLAT:
-            actual_change = _stat.add_flat(-_value)
+            actual_change = _stat.add_flat(-_applied_value)
         StatModifierType.PERCENT:
-            actual_change = _stat.add_percent(-_value)
+            actual_change = _stat.add_percent(-_applied_value)
         StatModifierType.MAX_FLAT:
-            actual_change = _stat.add_max_flat(-_value)
+            actual_change = _stat.add_max_flat(-_applied_value)
         StatModifierType.MAX_PERCENT:
-            actual_change = _stat.add_max_percent(-_value)
+            actual_change = _stat.add_max_percent(-_applied_value)
         StatModifierType.VALUE:
-            actual_change = _stat.add_value(-_value)
+            actual_change = _stat.add_value(-_applied_value)
         StatModifierType.MAX_VALUE:
-            actual_change = _stat.add_max_value(-_value)
+            actual_change = _stat.add_max_value(-_applied_value)
 
     _is_applied = false
     return -actual_change  # Return positive value for amount removed
@@ -172,6 +197,7 @@ func to_dict() -> Dictionary:
         "type": _type,
         "value": _value,
         "is_applied": _is_applied,
+        "apply_only_once": _apply_only_once
     }
 
 ## Loads this modifier from a dictionary.
@@ -180,3 +206,4 @@ func from_dict(dict: Dictionary) -> void:
     if dict.has("type"): _type = dict["type"]
     if dict.has("value"): _value = dict["value"]
     if dict.has("is_applied"): _is_applied = dict["is_applied"]
+    if dict.has("apply_only_once"): _apply_only_once = dict["apply_only_once"]

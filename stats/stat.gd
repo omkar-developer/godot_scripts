@@ -14,47 +14,53 @@ var enable_signal := true:
 signal value_changed ## Emit when stat value changes
 
 @export_category("Stat")
-## Clamps the value to be between min_value and max_value
-## Base value will be clamped between min_value and max_value
-@export var clamped:bool:
+## Clamps the base value to be between min_value and max_value
+@export var base_value_clamped:bool:
     set(value):
-        if clamped == value: return
-        clamped = value
-        var old_value = base_value
-        if clamped: base_value = clamp(base_value, min_value, get_max())
-        if old_value != base_value: on_value_changed()
+        if base_value_clamped == value: return
+        base_value_clamped = value
+        enable_signal = false
+        if base_value_clamped: base_value = clamp(base_value, min_value, get_max())
+        enable_signal = true
+        on_value_changed()
 
 ## Base value
 @export var base_value:float:
     set(value):
         if base_value == value: return
-        if clamped: base_value = clamp(value, min_value, get_max())
-        else: base_value = value
+        base_value = value
+        enable_signal = false
+        if base_value_clamped: base_value = clamp(base_value, min_value, get_max())
+        enable_signal = true
         on_value_changed()
 
 ## Min value
 @export var min_value:float: 
     set(value):
         if min_value == value: return
-        min_value = min(value, max_value)
-        if clamped: base_value = clamp(base_value, min_value, get_max())
+        min_value = value
+        enable_signal = false
+        if base_value_clamped: base_value = clamp(base_value, min_value, get_max())
+        enable_signal = true
         on_value_changed()
 
 ## Max value
 @export var max_value:float:
     set(value):
         if max_value == value: return
-        max_value = max(value, min_value)
-        if clamped: base_value = clamp(base_value, min_value, get_max())
+        max_value = value
+        enable_signal = false
+        if base_value_clamped: base_value = clamp(base_value, min_value, get_max())
+        enable_signal = true
         on_value_changed()
 
 @export_group("Modifiers")
-## Clamps the value to be between min_value and max_value,
-## Base value is not affected it has no limit unless clamped is true
-@export var clamped_modifier:bool:
+## Clamps the final value to be between min_value and max_value,
+## Base value is not affected
+@export var final_value_clamped:bool:
     set(value):
-        if clamped_modifier == value: return
-        clamped_modifier = value
+        if final_value_clamped == value: return
+        final_value_clamped = value
         on_value_changed()
 
 ## Percent modifier
@@ -62,6 +68,10 @@ signal value_changed ## Emit when stat value changes
     set(value):
         if percent_modifier == value: return
         percent_modifier = value
+        enable_signal = false
+        if percent_modifier_clamped: percent_modifier = clamp(percent_modifier, percent_modifier_min, percent_modifier_max)
+        if base_value_clamped: base_value = clamp(base_value, min_value, get_max())
+        enable_signal = true
         on_value_changed()
 
 ## Flat modifier
@@ -69,6 +79,10 @@ signal value_changed ## Emit when stat value changes
     set(value):
         if flat_modifier == value: return
         flat_modifier = value
+        enable_signal = false
+        if flat_modifier_clamped: flat_modifier = clamp(flat_modifier, flat_modifier_min, flat_modifier_max)
+        if base_value_clamped: base_value = clamp(base_value, min_value, get_max())
+        enable_signal = true
         on_value_changed()
 
 ## Max percent modifier
@@ -76,7 +90,10 @@ signal value_changed ## Emit when stat value changes
     set(value):
         if max_percent_modifier == value: return
         max_percent_modifier = value
-        if clamped: base_value = clamp(base_value, min_value, get_max())
+        enable_signal = false
+        if max_percent_modifier_clamped: max_percent_modifier = clamp(max_percent_modifier, max_percent_modifier_min, max_percent_modifier_max)
+        if base_value_clamped: base_value = clamp(base_value, min_value, get_max())
+        enable_signal = true
         on_value_changed()
 
 ## Max flat modifier
@@ -84,7 +101,135 @@ signal value_changed ## Emit when stat value changes
     set(value):
         if max_flat_modifier == value: return
         max_flat_modifier = value
-        if clamped: base_value = clamp(base_value, min_value, get_max())
+        enable_signal = false
+        if max_flat_modifier_clamped: max_flat_modifier = clamp(max_flat_modifier, max_flat_modifier_min, max_flat_modifier_max)
+        if base_value_clamped: base_value = clamp(base_value, min_value, get_max())
+        enable_signal = true
+        on_value_changed()
+
+@export_category("Clamping")
+## Clamps the flat modifier to be between min_value and max_value
+@export var flat_modifier_clamped:bool:
+    set(value):
+        if flat_modifier_clamped == value: return
+        flat_modifier_clamped = value
+        enable_signal = false
+        if flat_modifier_clamped: flat_modifier = clamp(flat_modifier, flat_modifier_min, flat_modifier_max)
+        if base_value_clamped: base_value = clamp(base_value, min_value, get_max())
+        enable_signal = true
+        on_value_changed()
+
+@export var flat_modifier_min:float:
+    set(value):
+        if flat_modifier_min == value: return
+        flat_modifier_min = value
+        enable_signal = false
+        if flat_modifier_clamped: flat_modifier = clamp(flat_modifier, flat_modifier_min, flat_modifier_max)
+        if base_value_clamped: base_value = clamp(base_value, min_value, get_max())
+        enable_signal = true
+        on_value_changed()
+
+@export var flat_modifier_max:float:
+    set(value):
+        if flat_modifier_max == value: return
+        flat_modifier_max = value
+        enable_signal = false
+        if flat_modifier_clamped: flat_modifier = clamp(flat_modifier, flat_modifier_min, flat_modifier_max)
+        if base_value_clamped: base_value = clamp(base_value, min_value, get_max())
+        enable_signal = true
+        on_value_changed()
+
+## Clamps the percent modifier to be between min_value and max_value
+@export var percent_modifier_clamped:bool:
+    set(value):
+        if percent_modifier_clamped == value: return
+        percent_modifier_clamped = value
+        enable_signal = false
+        if percent_modifier_clamped: percent_modifier = clamp(percent_modifier, percent_modifier_min, percent_modifier_max)
+        if base_value_clamped: base_value = clamp(base_value, min_value, get_max())
+        enable_signal = true
+        on_value_changed()
+
+@export var percent_modifier_min:float:
+    set(value):
+        if percent_modifier_min == value: return
+        percent_modifier_min = value
+        enable_signal = false
+        if percent_modifier_clamped: percent_modifier = clamp(percent_modifier, percent_modifier_min, percent_modifier_max)
+        if base_value_clamped: base_value = clamp(base_value, min_value, get_max())
+        enable_signal = true
+        on_value_changed()
+
+@export var percent_modifier_max:float:
+    set(value):
+        if percent_modifier_max == value: return
+        percent_modifier_max = value
+        enable_signal = false
+        if percent_modifier_clamped: percent_modifier = clamp(percent_modifier, percent_modifier_min, percent_modifier_max)
+        if base_value_clamped: base_value = clamp(base_value, min_value, get_max())
+        enable_signal = true
+        on_value_changed()
+
+## Clamps the max percent modifier to be between min_value and max_value
+@export var max_percent_modifier_clamped:bool:
+    set(value):
+        if max_percent_modifier_clamped == value: return
+        max_percent_modifier_clamped = value
+        enable_signal = false
+        if max_percent_modifier_clamped: max_percent_modifier = clamp(max_percent_modifier, max_percent_modifier_min, max_percent_modifier_max)
+        if base_value_clamped: base_value = clamp(base_value, min_value, get_max())
+        enable_signal = true
+        on_value_changed()
+
+@export var max_percent_modifier_min:float:
+    set(value):
+        if max_percent_modifier_min == value: return
+        max_percent_modifier_min = value
+        enable_signal = false
+        if max_percent_modifier_clamped: max_percent_modifier = clamp(max_percent_modifier, max_percent_modifier_min, max_percent_modifier_max)
+        if base_value_clamped: base_value = clamp(base_value, min_value, get_max())
+        enable_signal = true
+        on_value_changed()
+
+@export var max_percent_modifier_max:float:
+    set(value):
+        if max_percent_modifier_max == value: return
+        max_percent_modifier_max = value
+        enable_signal = false
+        if max_percent_modifier_clamped: max_percent_modifier = clamp(max_percent_modifier, max_percent_modifier_min, max_percent_modifier_max)
+        if base_value_clamped: base_value = clamp(base_value, min_value, get_max())
+        enable_signal = true
+        on_value_changed()
+
+## Clamps the max flat modifier to be between min_value and max_value
+@export var max_flat_modifier_clamped:bool:
+    set(value):
+        if max_flat_modifier_clamped == value: return
+        max_flat_modifier_clamped = value
+        enable_signal = false
+        if max_flat_modifier_clamped: max_flat_modifier = clamp(max_flat_modifier, max_flat_modifier_min, max_flat_modifier_max)
+        if base_value_clamped: base_value = clamp(base_value, min_value, get_max())
+        enable_signal = true
+        on_value_changed()
+
+@export var max_flat_modifier_min:float:
+    set(value):
+        if max_flat_modifier_min == value: return
+        max_flat_modifier_min = value
+        enable_signal = false
+        if max_flat_modifier_clamped: max_flat_modifier = clamp(max_flat_modifier, max_flat_modifier_min, max_flat_modifier_max)
+        if base_value_clamped: base_value = clamp(base_value, min_value, get_max())
+        enable_signal = true
+        on_value_changed()
+
+@export var max_flat_modifier_max:float:
+    set(value):
+        if max_flat_modifier_max == value: return
+        max_flat_modifier_max = value
+        enable_signal = false
+        if max_flat_modifier_clamped: max_flat_modifier = clamp(max_flat_modifier, max_flat_modifier_min, max_flat_modifier_max)
+        if base_value_clamped: base_value = clamp(base_value, min_value, get_max())
+        enable_signal = true
         on_value_changed()
 
 ## Emit when stat value changes
@@ -98,10 +243,10 @@ func on_value_changed() -> void:
         cached_max = current_max
 
 ## Constructor
-func _init(_base_value = 0.0, _clamped = true, _min_value = 0.0, _max_value = 100.0, _clamped_modifier = false, _flat_modifier = 0.0, _percent_modifier = 0.0, _max_percent_modifier = 0.0, _max_flat_modifier = 0.0) -> void:
+func _init(_base_value = 0.0, _base_value_clamped = true, _min_value = 0.0, _max_value = 100.0, _final_value_clamped = false, _flat_modifier = 0.0, _percent_modifier = 0.0, _max_percent_modifier = 0.0, _max_flat_modifier = 0.0) -> void:
     enable_signal = false
-    self.clamped = _clamped
-    self.clamped_modifier = _clamped_modifier
+    self.base_value_clamped = _base_value_clamped
+    self.final_value_clamped = _final_value_clamped
     self.base_value = _base_value
     self.min_value = _min_value
     self.max_value = _max_value
@@ -111,9 +256,9 @@ func _init(_base_value = 0.0, _clamped = true, _min_value = 0.0, _max_value = 10
     self.max_flat_modifier = _max_flat_modifier
     enable_signal = true
 
-## Returns the calculated value of the stat and if it is clamped_modifier returns the clamped value
+## Returns the calculated value of the stat and if it is final_value_clamped returns the clamped value
 func get_value() -> float:
-    if clamped_modifier:
+    if final_value_clamped:
         return clamp(base_value + ((percent_modifier / 100.0) * base_value) + flat_modifier, min_value, get_max())
     else: 
         return base_value + ((percent_modifier / 100.0) * base_value) + flat_modifier
@@ -190,6 +335,20 @@ func add_max_value(amount: float) -> float:
     max_value += amount
     return max_value - old_val
 
+func add_min_value(amount: float) -> float:
+    var old_val = min_value
+    min_value += amount
+    return min_value - old_val
+
+func get_as_bool() -> bool:
+    return cached_value != 0
+
+func set_as_bool(value: bool) -> void:
+    if value:
+        base_value = 1.0
+    else:
+        base_value = 0.0
+
 ## reset all modifiers
 func reset_modifiers() -> void:
     enable_signal = false
@@ -200,6 +359,7 @@ func reset_modifiers() -> void:
     cached_value = 0.0
     cached_max = 0.0
     enable_signal = true
+    on_value_changed()
 
 ## Returns a string representation of the stat
 func string() -> String:
@@ -216,19 +376,51 @@ func to_dict() -> Dictionary:
         "max_percent_modifier": max_percent_modifier,
         "min_value": min_value,
         "max_value": max_value,
-        "clamped_modifier": clamped_modifier,
-        "clamped": clamped,
+        "final_value_clamped": final_value_clamped,
+        "base_value_clamped": base_value_clamped,
+        "flat_modifier_clamped": flat_modifier_clamped,
+        "percent_modifier_clamped": percent_modifier_clamped,
+        "max_flat_modifier_clamped": max_flat_modifier_clamped,
+        "max_percent_modifier_clamped": max_percent_modifier_clamped,
+        "flat_modifier_min": flat_modifier_min,
+        "flat_modifier_max": flat_modifier_max,
+        "percent_modifier_min": percent_modifier_min,
+        "percent_modifier_max": percent_modifier_max,
+        "max_flat_modifier_min": max_flat_modifier_min,
+        "max_flat_modifier_max": max_flat_modifier_max,
+        "max_percent_modifier_min": max_percent_modifier_min,
+        "max_percent_modifier_max": max_percent_modifier_max
     }
 
 func from_dict(dict: Dictionary) -> void:
     enable_signal = false
-    max_value = dict.max_value
-    min_value = dict.min_value
-    base_value = dict.base_value
-    flat_modifier = dict.flat_modifier
-    percent_modifier = dict.percent_modifier
-    max_flat_modifier = dict.max_flat_modifier
-    max_percent_modifier = dict.max_percent_modifier    
-    clamped_modifier = dict.clamped_modifier
-    clamped = dict.clamped
+    
+    # Set non-clamped values first
+    max_value = dict.get("max_value", max_value)
+    min_value = dict.get("min_value", min_value)
+    base_value = dict.get("base_value", base_value)
+    flat_modifier = dict.get("flat_modifier", flat_modifier)
+    percent_modifier = dict.get("percent_modifier", percent_modifier)
+    max_flat_modifier = dict.get("max_flat_modifier", max_flat_modifier)
+    max_percent_modifier = dict.get("max_percent_modifier", max_percent_modifier)
+    
+    # Set min/max limits
+    flat_modifier_min = dict.get("flat_modifier_min", flat_modifier_min)
+    flat_modifier_max = dict.get("flat_modifier_max", flat_modifier_max)
+    percent_modifier_min = dict.get("percent_modifier_min", percent_modifier_min)
+    percent_modifier_max = dict.get("percent_modifier_max", percent_modifier_max)
+    max_flat_modifier_min = dict.get("max_flat_modifier_min", max_flat_modifier_min)
+    max_flat_modifier_max = dict.get("max_flat_modifier_max", max_flat_modifier_max)
+    max_percent_modifier_min = dict.get("max_percent_modifier_min", max_percent_modifier_min)
+    max_percent_modifier_max = dict.get("max_percent_modifier_max", max_percent_modifier_max)
+    
+    # Set clamping flags last to trigger validation
+    final_value_clamped = dict.get("final_value_clamped", final_value_clamped)
+    base_value_clamped = dict.get("base_value_clamped", base_value_clamped)
+    flat_modifier_clamped = dict.get("flat_modifier_clamped", flat_modifier_clamped)
+    percent_modifier_clamped = dict.get("percent_modifier_clamped", percent_modifier_clamped)
+    max_flat_modifier_clamped = dict.get("max_flat_modifier_clamped", max_flat_modifier_clamped)
+    max_percent_modifier_clamped = dict.get("max_percent_modifier_clamped", max_percent_modifier_clamped)
+    
     enable_signal = true
+    on_value_changed()
