@@ -1,10 +1,10 @@
 extends Resource
 
-#TODO: Predict future value if modifier_applied
-## Class for managing _stat modifications.
+## Class for managing stat modifications.
 class_name StatModifier
 
-## Enum defining types of _stat modifications.
+## Enum defining types of stat modifications.
+## Keep this as enum for inspector compatibility
 enum StatModifierType {
     FLAT, ## Flat modifier
     PERCENT, ## Percent modifier
@@ -14,7 +14,7 @@ enum StatModifierType {
     MAX_PERCENT ## Max percent modifier
 }
 
-## Name of the _stat this modifier affects.
+## Name of the stat this modifier affects.
 @export var _stat_name: String
 
 ## Type of the modification (e.g., FLAT, PERCENT, etc.).
@@ -23,153 +23,120 @@ enum StatModifierType {
 ## The value of the modification to apply.
 @export var _value: float
 
-## The maximum number of times this modifier can be applied.[br]
-## A value of -1 means it can be applied indefinitely.
-@export var max_apply_count: int = -1
+## Whether this modifier should only be applied once.
+@export var _apply_only_once := false
 
-## If true, only applies the modifier if it's between the min and max limits.
-@export var apply_only_if_between_limit := false
-@export var min_limit := 0
-@export var max_limit := 100
-
-## The _stat instance this modifier is linked to.
+## The stat instance this modifier is linked to.
 var _stat: Stat
 
-## Tracks how many times the modifier has been applied.
-var _apply_count := 0
+## Is this modifier currently applied
+var _is_applied := false
 
-## Initializes the modifier with the provided _stat name, type, and value.
-func _init(stat_name: String = "", type: StatModifierType = StatModifierType.FLAT, value: float = 0.0, _max_apply_count: int = -1) -> void:
+## Initializes the modifier with the provided stat name, type, and value.
+func _init(stat_name: String = "", type: StatModifierType = StatModifierType.FLAT, value: float = 0.0) -> void:
     self._stat_name = stat_name
     self._type = type
     self._value = value
-    self.max_apply_count = _max_apply_count
 
-## Initializes the _stat reference by fetching it from the provided _parent.[br]
-## [param _parent]: The node to fetch the _stat from.
-func init_stat(_parent: Object) -> void:
-    if _parent == null or _stat != null: return
-    _stat = _parent.get_stat(_stat_name)
+## Initializes the stat reference by fetching it from the provided parent.
+## [param parent]: The node to fetch the stat from.
+func init_stat(parent: Object) -> void:
+    if parent == null or _stat != null: return
+    _stat = parent.get_stat(_stat_name)
 
-## Clears the _stat reference to uninitialize the modifier.
-func uninit_stat(_remove_all: bool = true) -> void:
-    if _remove_all: remove_all()
+## Clears the stat reference to uninitialize the modifier.
+func uninit_stat() -> void:
+    if _is_applied: remove()
     _stat = null
 
-## Merges another modifier into this one by adding its value to this modifier's value.[br]
+## Merges another modifier into this one by adding its value to this modifier's value.
 ## [param mod]: The modifier to merge.
 func merge(mod: StatModifier) -> void:
     set_value(_value + mod._value)
 
-## Checks if another modifier is equivalent to this one (same type and _stat name).[br]
-## [param mod]: The modifier to compare.[br]
+## Checks if another modifier is equivalent to this one (same type and stat name).
+## [param mod]: The modifier to compare.
 ## [return]: True if the modifiers are equal, false otherwise.
 func is_equal(mod: StatModifier) -> bool:
     return _type == mod._type and _stat_name == mod._stat_name
 
-## Checks if the modifier is valid (i.e., linked to a _stat).[br]
-## [return]: True if the modifier has a valid _stat reference, false otherwise.
+## Checks if the modifier is valid (i.e., linked to a stat).
+## [return]: True if the modifier has a valid stat reference, false otherwise.
 func is_valid() -> bool:
     return _stat != null
 
-## Checks if the modifier is currently applied to the _stat.[br]
+## Checks if the modifier is currently applied to the stat.
 ## [return]: True if the modifier is applied, false otherwise.
-func is_applied(multiplier := 1) -> bool:
-    return _apply_count >= multiplier
-
-## Checks if the modifier can be applied (based on max_apply_count).[br]
-## [return]: True if the modifier can be applied, false otherwise.
-func can_apply(multiplier := 1) -> bool:
-    return max_apply_count <= -1 or _apply_count + multiplier <= max_apply_count
-
-func update() -> void:
-    var old_count = _apply_count
-    remove_all()
-    apply(old_count)
+func is_applied() -> bool:
+    return _is_applied
 
 ## Sets the value of the modifier.
-## [param _value]: The value to set.
+## [param value]: The value to set.
 func set_value(value: float = 0.0) -> void:
-    var old_count = _apply_count
-    remove_all()
-    self._value = value
-    apply(old_count)
+    if _is_applied and _apply_only_once:
+        remove()
+        self._value = value
+        apply()
+    else:
+        self._value = value
 
 ## Sets the type of the modifier.
-## [param _type]: The type to set.
+## [param type]: The type to set.
 func set_type(type: StatModifierType = StatModifierType.FLAT) -> void:
-    var old_count = _apply_count
-    remove_all()
-    self._type = type
-    apply(old_count)
+    if _is_applied and _apply_only_once:
+        remove()
+        self._type = type
+        apply()
+    else:
+        self._type = type
 
-## Applies the modifier to the _stat if it's valid and can be applied.
-func apply(multiplier := 1) -> void:
-    if not is_valid(): return
-    if not can_apply(multiplier): return
+## Applies the modifier to the stat and returns the actual amount applied
+func apply() -> float:
+    if not is_valid(): return 0.0
+    if _is_applied and _apply_only_once: return 0.0  # Prevent double application
+    
+    var actual_change = 0.0
     match _type:
         StatModifierType.FLAT:
-            if apply_only_if_between_limit:
-                if _stat.flat_modifier + _value * multiplier < min_limit or _stat.flat_modifier + _value * multiplier > max_limit: return
-            _stat.flat_modifier += _value * multiplier
+            actual_change = _stat.add_flat(_value)
         StatModifierType.PERCENT:
-            if apply_only_if_between_limit:
-                if _stat.percent_modifier + _value * multiplier < min_limit or _stat.percent_modifier + _value * multiplier > max_limit: return
-            _stat.percent_modifier += _value * multiplier
-        StatModifierType.VALUE:
-            if apply_only_if_between_limit:
-                if _stat.base_value + _value * multiplier < min_limit or _stat.base_value + _value * multiplier > max_limit: return
-            _stat.base_value += _value * multiplier
-        StatModifierType.MAX_VALUE:
-            if apply_only_if_between_limit:
-                if _stat.max_value + _value * multiplier < min_limit or _stat.max_value + _value * multiplier > max_limit: return
-            _stat.max_value += _value * multiplier
+            actual_change = _stat.add_percent(_value)
         StatModifierType.MAX_FLAT:
-            if apply_only_if_between_limit:
-                if _stat.max_flat_modifier + _value * multiplier < min_limit or _stat.max_flat_modifier + _value * multiplier > max_limit: return
-            _stat.max_flat_modifier += _value * multiplier
+            actual_change = _stat.add_max_flat(_value)
         StatModifierType.MAX_PERCENT:
-            if apply_only_if_between_limit:
-                if _stat.max_percent_modifier + _value * multiplier < min_limit or _stat.max_percent_modifier + _value * multiplier > max_limit: return
-            _stat.max_percent_modifier += _value * multiplier
-    _apply_count += (1 * multiplier)
+            actual_change = _stat.add_max_percent(_value)
+        StatModifierType.VALUE:
+            actual_change = _stat.add_value(_value)
+        StatModifierType.MAX_VALUE:
+            actual_change = _stat.add_max_value(_value)
 
-## Removes the modifier from the _stat if it's valid and currently applied.
-func remove(multiplier := 1) -> void:
-    if not is_valid(): return
-    if not is_applied(multiplier): return
+    _is_applied = true
+    return actual_change
+
+## Removes the modifier from the stat and returns the actual amount removed
+func remove() -> float:
+    if not is_valid(): return 0.0
+    if not _is_applied: return 0.0
+    
+    var actual_change = 0.0
     match _type:
         StatModifierType.FLAT:
-            if apply_only_if_between_limit:
-                if _stat.flat_modifier - _value * multiplier < min_limit or _stat.flat_modifier - _value * multiplier > max_limit: return
-            _stat.flat_modifier -= _value * multiplier
+            actual_change = _stat.add_flat(-_value)
         StatModifierType.PERCENT:
-            if apply_only_if_between_limit:
-                if _stat.percent_modifier - _value * multiplier < min_limit or _stat.percent_modifier - _value * multiplier > max_limit: return
-            _stat.percent_modifier -= _value * multiplier
-        StatModifierType.VALUE:
-            if apply_only_if_between_limit:
-                if _stat.base_value - _value * multiplier < min_limit or _stat.base_value - _value * multiplier > max_limit: return
-            _stat.base_value -= _value * multiplier
-        StatModifierType.MAX_VALUE:
-            if apply_only_if_between_limit:
-                if _stat.max_value - _value * multiplier < min_limit or _stat.max_value - _value * multiplier > max_limit: return
-            _stat.max_value -= _value * multiplier
+            actual_change = _stat.add_percent(-_value)
         StatModifierType.MAX_FLAT:
-            if apply_only_if_between_limit:
-                if _stat.max_flat_modifier - _value * multiplier < min_limit or _stat.max_flat_modifier - _value * multiplier > max_limit: return
-            _stat.max_flat_modifier -= _value * multiplier
+            actual_change = _stat.add_max_flat(-_value)
         StatModifierType.MAX_PERCENT:
-            if apply_only_if_between_limit:
-                if _stat.max_percent_modifier - _value * multiplier < min_limit or _stat.max_percent_modifier - _value * multiplier > max_limit: return
-            _stat.max_percent_modifier -= _value * multiplier
-    _apply_count -= (1 * multiplier)
+            actual_change = _stat.add_max_percent(-_value)
+        StatModifierType.VALUE:
+            actual_change = _stat.add_value(-_value)
+        StatModifierType.MAX_VALUE:
+            actual_change = _stat.add_max_value(-_value)
 
-## Removes all applied modifiers from the _stat.
-func remove_all() -> void:
-    remove(_apply_count)
+    _is_applied = false
+    return -actual_change  # Return positive value for amount removed
 
-## Returns the name of the _stat this modifier affects.
+## Returns the name of the stat this modifier affects.
 func get_stat_name() -> String:
     return _stat_name
 
@@ -181,13 +148,18 @@ func get_type() -> StatModifierType:
 func get_value() -> float:
     return _value
 
-## Returns the number of times this modifier has been applied.
-func get_apply_count() -> int:
-    return _apply_count
-
 ## Print debug values
 func _to_string() -> String:
-    return "StatModifier: " + _stat_name + " " + str(_type) + " " + str(_value)
+    var applied_text = "not applied"
+    if _is_applied:
+        applied_text = "applied"
+        
+    return "StatModifier: %s %s %.2f (%s)" % [
+        _stat_name, 
+        StatModifierType.keys()[_type], 
+        _value,
+        applied_text
+    ]
 
 ## Returns a duplicate copy of this modifier.
 func copy() -> StatModifier:
@@ -199,12 +171,12 @@ func to_dict() -> Dictionary:
         "stat_name": _stat_name,
         "type": _type,
         "value": _value,
-        "apply_count": _apply_count
+        "is_applied": _is_applied,
     }
 
 ## Loads this modifier from a dictionary.
 func from_dict(dict: Dictionary) -> void:
-    _stat_name = dict["stat_name"]
-    _type = dict["type"]
-    _value = dict["value"]
-    _apply_count = dict["apply_count"]
+    if dict.has("stat_name"): _stat_name = dict["stat_name"]
+    if dict.has("type"): _type = dict["type"]
+    if dict.has("value"): _value = dict["value"]
+    if dict.has("is_applied"): _is_applied = dict["is_applied"]

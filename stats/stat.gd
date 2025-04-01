@@ -6,6 +6,11 @@ class_name Stat
 var cached_value := 0.0
 var cached_max := 0.0
 
+var enable_signal := true:
+    set(value):
+        enable_signal = value
+        on_value_changed()
+
 signal value_changed ## Emit when stat value changes
 
 @export_category("Stat")
@@ -84,13 +89,17 @@ signal value_changed ## Emit when stat value changes
 
 ## Emit when stat value changes
 func on_value_changed() -> void:
-    if cached_value != get_value() or cached_max != get_max():
-        cached_value = get_value()
-        cached_max = get_max()
+    if not enable_signal: return
+    var current_value = get_value()
+    var current_max = get_max()
+    if cached_value != current_value or cached_max != current_max:
         value_changed.emit()
+        cached_value = current_value
+        cached_max = current_max
 
 ## Constructor
 func _init(_base_value = 0.0, _clamped = true, _min_value = 0.0, _max_value = 100.0, _clamped_modifier = false, _flat_modifier = 0.0, _percent_modifier = 0.0, _max_percent_modifier = 0.0, _max_flat_modifier = 0.0) -> void:
+    enable_signal = false
     self.clamped = _clamped
     self.clamped_modifier = _clamped_modifier
     self.base_value = _base_value
@@ -100,6 +109,7 @@ func _init(_base_value = 0.0, _clamped = true, _min_value = 0.0, _max_value = 10
     self.flat_modifier = _flat_modifier
     self.max_percent_modifier = _max_percent_modifier
     self.max_flat_modifier = _max_flat_modifier
+    enable_signal = true
 
 ## Returns the calculated value of the stat and if it is clamped_modifier returns the clamped value
 func get_value() -> float:
@@ -150,24 +160,46 @@ func is_max() -> bool:
 func is_min() -> bool:
     return get_value() == min_value
 
-## add value to a flat modifier
-func add_flat(amount: float) -> void:
+func add_flat(amount: float) -> float:
+    var old_val = flat_modifier
     flat_modifier += amount
+    return flat_modifier - old_val
 
-## add value to a percent modifier
-func add_percent(amount: float) -> void:
+func add_percent(amount: float) -> float:
+    var old_val = percent_modifier
     percent_modifier += amount
+    return percent_modifier - old_val
 
-## add value to the base value
-func add_value(amount: float) -> void:
+func add_max_flat(amount: float) -> float:
+    var old_val = max_flat_modifier
+    max_flat_modifier += amount
+    return max_flat_modifier - old_val
+
+func add_max_percent(amount: float) -> float:
+    var old_val = max_percent_modifier
+    max_percent_modifier += amount
+    return max_percent_modifier - old_val
+
+func add_value(amount: float) -> float:
+    var old_val = base_value
     base_value += amount
+    return base_value - old_val
+
+func add_max_value(amount: float) -> float:
+    var old_val = max_value
+    max_value += amount
+    return max_value - old_val
 
 ## reset all modifiers
 func reset_modifiers() -> void:
+    enable_signal = false
     percent_modifier = 0.0
     flat_modifier = 0.0
     max_flat_modifier = 0.0
     max_percent_modifier = 0.0
+    cached_value = 0.0
+    cached_max = 0.0
+    enable_signal = true
 
 ## Returns a string representation of the stat
 func string() -> String:
@@ -175,4 +207,28 @@ func string() -> String:
         get_value(), base_value, flat_modifier, percent_modifier
     ]
 
-# Clamping modifier values
+func to_dict() -> Dictionary:
+    return {
+        "base_value": base_value,
+        "flat_modifier": flat_modifier,
+        "percent_modifier": percent_modifier,
+        "max_flat_modifier": max_flat_modifier,
+        "max_percent_modifier": max_percent_modifier,
+        "min_value": min_value,
+        "max_value": max_value,
+        "clamped_modifier": clamped_modifier,
+        "clamped": clamped,
+    }
+
+func from_dict(dict: Dictionary) -> void:
+    enable_signal = false
+    max_value = dict.max_value
+    min_value = dict.min_value
+    base_value = dict.base_value
+    flat_modifier = dict.flat_modifier
+    percent_modifier = dict.percent_modifier
+    max_flat_modifier = dict.max_flat_modifier
+    max_percent_modifier = dict.max_percent_modifier    
+    clamped_modifier = dict.clamped_modifier
+    clamped = dict.clamped
+    enable_signal = true
