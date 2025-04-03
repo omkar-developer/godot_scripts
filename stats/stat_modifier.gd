@@ -65,6 +65,8 @@ func init_stat(parent: Object) -> bool:
 ## Clears the stat reference to uninitialize the modifier.
 func uninit_stat(remove_all:bool = true) -> void:
     if remove_all: remove()
+    _is_applied = false
+    _applied_value = 0.0
     _stat = null
 
 ## Merges another modifier into this one by adding its value to this modifier's value.

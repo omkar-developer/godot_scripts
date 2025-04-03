@@ -344,3 +344,24 @@ func test_floating_point_precision():
     
     assert_eq(stat.get_value(), 100.0, "Stat should return to base value after small decrements")
     assert_false(modifier.is_applied(), "Modifier should no longer be applied after complete removal")
+
+# Test uninit_stat with no prior init
+func test_uninit_stat2():
+    var stat = _create_test_stat()
+    var parent = _create_parent_with_stat(stat)
+    var modifier = StatModifier.new("Health", StatModifier.StatModifierType.FLAT, 0.1)
+    modifier.init_stat(parent)
+
+    # Test uninit when remove_all is true
+    modifier.uninit_stat(true)
+    assert_false(modifier.is_applied(), "Modifier should no longer be applied after uninit")
+    assert_eq(stat.get_value(), 100.0, "Stat should return to base value after uninit")
+
+    # Re-init and test uninit when remove_all is false
+    modifier.init_stat(parent)
+    modifier.apply()
+    assert_eq(stat.get_value(), 100.1, "Stat should increase by applied value")
+    modifier.uninit_stat(false)
+    assert_false(modifier.is_applied(), "Modifier should not be applied after uninit")
+    assert_eq(modifier._applied_value, 0.0, "Applied value should still be zero")
+    assert_eq(stat.get_value(), 100.1, "Stat should return to base value after uninit")
