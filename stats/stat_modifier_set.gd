@@ -218,7 +218,7 @@ func to_dict() -> Dictionary:
 		"modifier_name": _modifier_name,
 		"group": _group,
 		"process": process,
-		"condition": condition.to_dict() if condition else null,
+		"condition": condition.to_dict() if condition else {},
 	}
 
 ## Loads this modifier set from a dictionary.

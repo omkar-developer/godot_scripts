@@ -8,7 +8,8 @@ extends Resource
 ## calculation, and boolean representation. Additionally, it supports serialization to and from dictionaries for easy
 ## saving and loading of stat configurations.
 
-class_name Stat
+#TODO: check cached at node init
+class_name Stat 
 
 ## Cached value of the stat
 var cached_value := 0.0
@@ -414,6 +415,24 @@ func reset_modifiers() -> void:
     cached_max = 0.0
     _enable_signal = true
     on_value_changed()
+
+## Returns the difference between the current stat and another stat.
+## [param other_stat]: The stat to compare with.
+## [return]: A dictionary containing:
+##           - "value_diff": The difference in the stat's value.
+##           - "max_diff": The difference in the stat's max value.
+func get_difference_from(other_stat: Stat) -> Dictionary:
+    if not other_stat:
+        push_error("Cannot calculate difference with a null stat")
+        return {}
+
+    var value_diff = other_stat.get_value() - self.get_value()
+    var max_diff = other_stat.get_max() - self.get_max()
+
+    return {
+        "value_diff": value_diff,
+        "max_diff": max_diff
+    }
 
 ## Returns a string representation of the stat.
 func string() -> String:
