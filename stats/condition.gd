@@ -64,7 +64,10 @@ var _timer := 0.0
 ## Parsed math expression (used with `ConditionType.MATH_EXPRESSION`).
 var _expression: Expression = null
 
-### Private Methods ###
+## Returns the current state of the condition (true/false). [br]
+## [return]: The current state of the condition.
+func get_condition() -> bool:
+    return _current_condition
 
 ## Retrieves the value of a given stat based on the specified type.[br]
 ## [param stat]: The stat to retrieve the value from. [br]
@@ -116,28 +119,29 @@ func _evaluate_condition() -> bool:
 ## Updates the condition state, checking if the result has changed.[br]
 ## [param _check_timer]: Whether to consider the cooldown timer.
 func _update(_check_timer := true) -> void:
-    if _timer > 0.0: return
+    if _check_timer and _timer > 0.0: return
     if _check_timer and cooldown > 0.0 and _timer <= 0.0:
         _timer = cooldown
         return
     var condition_result = _evaluate_condition()
-    if condition_result != _current_condition:
+    push_warning("Condition changed")
+    if condition_result != _current_condition:        
         _current_condition = condition_result
         condition_changed.emit(_current_condition)
 
 ## Establishes signal connections for the reference stats.
 func _make_connections() -> void:
-    if _ref_stat1 != null and not _ref_stat1.is_connected("value_changed", _update):
-        _ref_stat1.connect("value_changed", _update)
-    if _ref_stat2 != null and not _ref_stat2.is_connected("value_changed", _update):
-        _ref_stat2.connect("value_changed", _update)
+    if _ref_stat1 != null and not _ref_stat1.is_connected("value_changed", func (_new_value, _new_max, _old_value, _old_max): _update()):
+        _ref_stat1.connect("value_changed", func (_new_value, _new_max, _old_value, _old_max): _update())
+    if _ref_stat2 != null and not _ref_stat2.is_connected("value_changed", func (_new_value, _new_max, _old_value, _old_max): _update()):
+        _ref_stat2.connect("value_changed", func (_new_value, _new_max, _old_value, _old_max): _update())
 
 ## Removes signal connections for the reference stats.
 func _remove_connections() -> void:
-    if _ref_stat1 != null and _ref_stat1.is_connected("value_changed", _update):
-        _ref_stat1.disconnect("value_changed", _update)
-    if _ref_stat2 != null and _ref_stat2.is_connected("value_changed", _update):
-        _ref_stat2.disconnect("value_changed", _update)
+    if _ref_stat1 != null and _ref_stat1.is_connected("value_changed", func (_new_value, _new_max, _old_value, _old_max): _update()):
+        _ref_stat1.disconnect("value_changed", func (_new_value, _new_max, _old_value, _old_max): _update())
+    if _ref_stat2 != null and _ref_stat2.is_connected("value_changed", func (_new_value, _new_max, _old_value, _old_max): _update()):
+        _ref_stat2.disconnect("value_changed", func (_new_value, _new_max, _old_value, _old_max): _update())
 
 ## Initializes the condition with the given parent object.[br]
 ## [param parent]: The parent object to retrieve stats from.
@@ -152,6 +156,7 @@ func init_stat(parent: Object) -> void:
         if _expression.parse(_math_expression, ["value1", "value2"]) != OK:
             push_error("Error parsing condition math expression: " + _math_expression)
     _current_condition = _evaluate_condition()
+    condition_changed.emit(_current_condition)
 
 ## Cleans up connections and resets internal state.
 func uninit_stat() -> void:

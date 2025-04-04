@@ -1,4 +1,4 @@
-extends "res://addons/gut/test.gd"
+extends GutTest
 
 ## Helper function to create a Stat instance for testing
 func _create_test_stat(base_value: float = 100.0, min_value: float = 0.0, max_value: float = 200.0) -> Stat:

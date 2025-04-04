@@ -30,11 +30,16 @@ var _marked_for_deletion := false
 ## The _parent object associated with this modifier set.
 var _parent: Object
 
+## apply as soon as initialized or added to the list
 var _apply := true
+## remove effect when uninit
 var _remove_all := true
+## apply effect when condition is true when initializing 
 var _condition_apply_on_start := true
+## pause process when condition is false and vice versa
 var _condition_pause_process := false
 
+## Return the modifer name
 func get_modifier_name() -> String:
 	return _modifier_name
 
@@ -65,8 +70,8 @@ func _disconnect_condition() -> void:
 ## Merges a parallel StatModifierSet into this one.[br]
 ## [param modifer_set]: The StatModifierSet to merge.
 func _merge_parellel(modifer_set: StatModifierSet) -> void:
-	if _modifiers.size() != modifer_set._modifiers.size(): return
-	for i in range(modifer_set._modifiers.size() - 1, -1, -1):
+	if modifiers_count() != modifer_set.modifiers_count(): return
+	for i in range(modifer_set.modifiers_count() - 1, -1, -1):
 		if modifer_set._modifiers[i].is_equal(_modifiers[i]):
 			_modifiers[i].merge(modifer_set._modifiers[i])
 
@@ -79,11 +84,14 @@ func merge_mod(mod: StatModifierSet) -> void:
 ## Sets the value of a modifier at a given index.[br]
 ## [param mod_idx]: The index of the modifier to set the value of.[br]
 ## [param value]: The value to set.
-func set_mod_value(mod_idx: int, value: float) -> void:
+## [return]: True if the value was set, False otherwise.
+func set_mod_value(mod_idx: int, value: float) -> bool:
 	if _modifiers.size() > mod_idx:
 		_modifiers[mod_idx].set_value(value)
+		return true
 	else:
 		push_error("Invalid modifier index: " + str(mod_idx))
+		return false
 
 ## Finds a modifier in this set that matches the given modifier.[br]
 ## [param mod]: The modifier to find.[br]
@@ -100,7 +108,7 @@ func find_mod(mod: StatModifier) -> StatModifier:
 ## [return]: The modifier that targets the given stat and has the given type, or null if no such modifier is found.
 func find_mod_by_name_and_type(stat_name: String, type: StatModifier.StatModifierType) -> StatModifier:
 	for mod in _modifiers:
-		if mod.stat_name == stat_name and mod.type == type:
+		if mod.get_stat_name() == stat_name and mod.get_type() == type:
 			return mod
 	return null
 
@@ -109,7 +117,7 @@ func find_mod_by_name_and_type(stat_name: String, type: StatModifier.StatModifie
 ## [return]: The modifier that targets the given stat, or null if no such modifier is found.
 func find_mod_for_stat(stat_name: String) -> StatModifier:
 	for mod in _modifiers:
-		if mod.stat_name == stat_name:
+		if mod.get_stat_name() == stat_name:
 			return mod
 	return null
 
@@ -121,7 +129,7 @@ func _apply_effect() -> void:
 ## Removes all _modifiers in this set from the _parent.
 func _remove_effect() -> void:
 	for mod in _modifiers:
-		mod.remove_all()
+		mod.remove()
 
 ## Initializes all _modifiers in this set with the given _parent.[br]
 ## [param _parent]: The _parent to initialize the _modifiers with.
@@ -135,8 +143,9 @@ func init_modifiers(parent: Object) -> void:
 	if condition != null:
 		condition.init_stat(parent)
 		_connect_condition()
-		if condition._current_condition and _condition_apply_on_start:
+		if _condition_apply_on_start:
 			_apply_effect()
+			if _condition_pause_process: process = condition.get_condition()
 	# Apply effects
 	if _apply and condition == null:
 		_apply_effect()
@@ -153,12 +162,14 @@ func uninit_modifiers() -> void:
 ## Adds a modifier to this set.[br]
 ## [param mod]: The modifier to add.
 func add_modifier(mod: StatModifier) -> StatModifier:
-	if _marked_for_deletion or _parent == null: return null
+	if _marked_for_deletion or _parent == null or mod == null: return null
 	var mod2 = mod.duplicate(true)
 	_modifiers.append(mod2)
 	mod2.init_stat(_parent)
 	# Only apply if conditions are met
-	if (_apply and condition == null) or (condition != null and condition._current_condition and _condition_apply_on_start):
+	if _apply and condition == null:
+		mod2.apply()
+	if condition != null and _condition_apply_on_start:
 		mod2.apply()
 	return mod2
 
@@ -169,6 +180,15 @@ func remove_modifier(mod: StatModifier) -> void:
 	if mod2 == null: return
 	mod2.uninit_stat(_remove_all)
 	_modifiers.erase(mod2)
+
+## Returns a reference to the modifier at the specified index. If the index is out of range, returns null.
+func modifier_at(index: int) -> StatModifier:
+	if index < 0 or index >= len(_modifiers): return null   
+	return _modifiers[index]
+
+## Returns the number of _modifiers in this set.
+func modifiers_count() -> int:    
+	return len(_modifiers)
 
 ## Clears all _modifiers in this set.
 func clear_modifiers() -> void:    
@@ -223,12 +243,12 @@ func to_dict() -> Dictionary:
 
 ## Loads this modifier set from a dictionary.
 func from_dict(data: Dictionary) -> void:
-	_modifiers = data.get("modifiers", []).map(
+	_modifiers.assign(data.get("modifiers", []).map(
 		func(m_data): 
 			var m = StatModifier.new()
 			m.from_dict(m_data)
 			return m
-	)
+	))
 	_modifier_name = data.get("modifier_name", "")
 	_group = data.get("group", "")
 	process = data.get("process", false)

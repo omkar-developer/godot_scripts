@@ -1,4 +1,4 @@
-extends "res://addons/gut/test.gd"
+extends GutTest
 
 ## Base Value and Clamping Tests
 func test_base_value_within_range():
