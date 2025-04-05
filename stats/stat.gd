@@ -136,7 +136,7 @@ func _update_base_value():
 @export_category("Clamping")
 
 ## Clamps the flat modifier to be between [param flat_modifier_min] and [param flat_modifier_max].
-@export var flat_modifier_clamped:bool:
+@export var flat_modifier_clamped:bool = false:
     set(value):
         if flat_modifier_clamped == value: return
         flat_modifier_clamped = value
@@ -169,7 +169,7 @@ func _update_base_value():
         on_value_changed()
 
 ## Clamps the percent modifier to be between [param percent_modifier_min] and [param percent_modifier_max].
-@export var percent_modifier_clamped:bool:
+@export var percent_modifier_clamped:bool = false:
     set(value):
         if percent_modifier_clamped == value: return
         percent_modifier_clamped = value
@@ -202,7 +202,7 @@ func _update_base_value():
         on_value_changed()
 
 ## Clamps the max percent modifier to be between [param max_percent_modifier_min] and [param max_percent_modifier_max].
-@export var max_percent_modifier_clamped:bool:
+@export var max_percent_modifier_clamped:bool = false:
     set(value):
         if max_percent_modifier_clamped == value: return
         max_percent_modifier_clamped = value
@@ -235,7 +235,7 @@ func _update_base_value():
         on_value_changed()
 
 ## Clamps the max flat modifier to be between [param max_flat_modifier_min] and [param max_flat_modifier_max].
-@export var max_flat_modifier_clamped:bool:
+@export var max_flat_modifier_clamped:bool = false:
     set(value):
         if max_flat_modifier_clamped == value: return
         max_flat_modifier_clamped = value
@@ -287,7 +287,7 @@ func on_value_changed() -> void:
 ## [param _percent_modifier]: Initial percent modifier (default: 0.0).
 ## [param _max_percent_modifier]: Initial max percent modifier (default: 0.0).
 ## [param _max_flat_modifier]: Initial max flat modifier (default: 0.0).
-func _init(_base_value = 0.0, _base_value_clamped = true, _min_value = 0.0, _max_value = 100.0, _final_value_clamped = false, _flat_modifier = 0.0, _percent_modifier = 0.0, _max_percent_modifier = 0.0, _max_flat_modifier = 0.0) -> void:
+func _init(_base_value = 0.0, _base_value_clamped = false, _min_value = 0.0, _max_value = 100.0, _final_value_clamped = false, _flat_modifier = 0.0, _percent_modifier = 0.0, _max_percent_modifier = 0.0, _max_flat_modifier = 0.0) -> void:
     _enable_signal = false
     self.base_value_clamped = _base_value_clamped
     self.final_value_clamped = _final_value_clamped

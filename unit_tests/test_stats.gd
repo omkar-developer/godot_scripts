@@ -25,6 +25,7 @@ func test_min_equals_max():
     stat.min_value = 100.0
     stat.max_value = 100.0
     stat.base_value = 50.0
+    stat.base_value_clamped = true
     assert_eq(stat.get_value(), 100.0, "Value should be clamped to min_value (or max_value)")
 
 ## Signal Emission Tests

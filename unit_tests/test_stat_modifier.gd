@@ -26,7 +26,7 @@ func initialize(stat):
     _stat = stat
 
 # Method to fetch the stat by name
-func get_stat(stat_name: String) -> Stat:
+func get_stat(_stat_name: String) -> Stat:
     return _stat
 """
     script.reload()  # Reload the script to compile it
