@@ -23,6 +23,7 @@ class RefStatEntry:
 			2: return stat.max_value   # BASE_MAX_VALUE
 			3: return stat.get_max()   # MAX_VALUE
 			4: return stat.get_min()   # MIN_VALUE
+			5: return stat.get_normalized_value()   # NORMALIZED_VALUE
 		return 0.0
 
 ## Parent object that owns the stats
