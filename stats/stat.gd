@@ -8,7 +8,6 @@ extends Resource
 ## calculation, and boolean representation. Additionally, it supports serialization to and from dictionaries for easy
 ## saving and loading of stat configurations.
 
-#TODO: check cached at node init
 class_name Stat
 
 ## Epsilon value for floating point comparisons
@@ -53,7 +52,7 @@ func get_typed_value(raw_value: float) -> float:
 		StatType.BOOL: return 1.0 if raw_value > EPSILON else 0.0
 		_: return raw_value  # FLOAT
 
-@export_category("Stat")
+@export_group("Stat")
 
 ## Clamps the base value to be between [param min_value] and [param max_value].
 @export var base_value_clamped:bool:
@@ -159,8 +158,7 @@ func get_typed_value(raw_value: float) -> float:
 		_enable_signal = true
 		on_value_changed()
 
-@export_category("Clamping")
-
+@export_group("Limit")
 ## Clamps the flat modifier to be between [param flat_modifier_min] and [param flat_modifier_max].
 @export var flat_modifier_clamped:bool = false:
 	set(value):
