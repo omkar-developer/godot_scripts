@@ -3,6 +3,9 @@ extends Resource
 ## Class for managing stat modifications.
 class_name StatModifier
 
+signal on_applied
+signal on_removed
+
 ## Enum defining types of stat modifications.
 ## Keep this as enum for inspector compatibility
 enum StatModifierType {
@@ -14,7 +17,10 @@ enum StatModifierType {
     MAX_PERCENT, ## Max percent modifier
     MIN_VALUE, ## Min value modifier
     PERCENT_NORMALIZED, ## Percent normalized modifier value can be between 0 and 1
-    MAX_PERCENT_NORMALIZED ## Max percent normalized modifier value can be between 0 and 1
+    MAX_PERCENT_NORMALIZED, ## Max percent normalized modifier value can be between 0 and 1
+    SET_BASE, ## Set base value of a stat use only in special cases as directly settig value cant be tracked.
+    SET_MAX_VALUE, ## Set max value of a stat use only in special cases as directly settig value cant be tracked.
+    SET_MIN_VALUE ## Set min value of a stat use only in special cases as directly settig value cant be tracked.
 }
 
 ## Name of the stat this modifier affects.
@@ -147,6 +153,12 @@ func _apply_stat_modifier(type, stat, value) -> float:
             actual_change = stat.add_percent(value * 100.0)
         StatModifierType.MAX_PERCENT_NORMALIZED:
             actual_change = stat.add_max_percent(value * 100.0)
+        StatModifierType.SET_BASE:
+            actual_change = stat.set_base(value)
+        StatModifierType.SET_MAX_VALUE:
+            actual_change = stat.set_max_value(value)
+        StatModifierType.SET_MIN_VALUE:
+            actual_change = stat.set_min_value(value)
     return actual_change
 
 ## Returns a duplicate of the stat with the modifier applied.
@@ -168,17 +180,20 @@ func simulate_effect() -> Dictionary:
     return _stat.get_difference_from(temp_stat)
 
 ## Applies the modifier to the stat and returns the actual amount applied
-func apply() -> float:
+func apply(apply_value:float = 0.0) -> float:
     if not is_valid(): return 0.0
     if _is_applied and _apply_only_once: 
         push_warning("Attempted to reapply a one-time modifier")
         return 0.0
+    if apply_value == 0.0:
+        apply_value = _value
     
-    var actual_change = _apply_stat_modifier(_type, _stat, _value)
+    var actual_change = _apply_stat_modifier(_type, _stat, apply_value)
     
     if actual_change == 0.0: return 0.0
     _is_applied = true
     _applied_value += actual_change  # Track total applied effect
+    on_applied.emit()
     return actual_change
 
 ## Removes the modifier from the stat and returns the actual amount changed [br]
@@ -187,6 +202,13 @@ func apply() -> float:
 func remove(remove_all:bool = true) -> float:
     if not is_valid(): return 0.0
     if not _is_applied: return 0.0
+
+    # Early exit since set values cant be removed
+    if _type == StatModifierType.SET_BASE or _type == StatModifierType.SET_BASE or _type == StatModifierType.SET_BASE:
+        _applied_value = 0.0
+        _is_applied = false
+        on_removed.emit()
+        return 0.0
     
     # Determine how much to remove (typically the original _value)
     var removal_amount = _value
@@ -195,7 +217,7 @@ func remove(remove_all:bool = true) -> float:
     elif _value > 0.0 and _applied_value + (_value * -1.0) < 0.0:
         removal_amount = _applied_value
     elif _value < 0.0 and _applied_value + (_value * -1.0) > 0.0:
-        removal_amount = _applied_value
+        removal_amount = _applied_value    
     
     var actual_change = _apply_stat_modifier(_type, _stat, removal_amount * -1.0)
 
@@ -205,6 +227,7 @@ func remove(remove_all:bool = true) -> float:
     if abs(_applied_value) <= 0.000001:
         _is_applied = false
     
+    on_removed.emit()
     return actual_change
 
 ## Returns the name of the stat this modifier affects.

@@ -391,6 +391,27 @@ func is_min() -> bool:
 		# For INT and BOOL, direct comparison is fine
 		return get_value() == min_value
 
+## Sets the base value directly without any modifiers or calculations.
+func set_direct_value(amount: float) -> float:
+	if frozen: return 0.0
+	var old_val = base_value
+	base_value = get_typed_value(amount)
+	return base_value - old_val
+
+## Sets the maximum value directly without any modifiers or calculations.
+func set_max_value(new_max: float) -> float:
+	if frozen: return 0.0	
+	var old_max = max_value
+	max_value = get_typed_value(new_max)
+	return max_value - old_max
+
+## Sets the minimum value directly without any modifiers or calculations.
+func set_min_value(new_min: float) -> float:
+	if frozen: return 0.0	
+	var old_min = min_value
+	min_value = get_typed_value(new_min)
+	return min_value - old_min
+
 ## Adds a flat amount to the flat modifier.
 func add_flat(amount: float) -> float:
 	if frozen: return 0.0

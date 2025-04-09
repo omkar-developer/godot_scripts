@@ -175,20 +175,10 @@ func is_equal(mod: StatModifier) -> bool:
 
 ## Applies the modifier to the target stat
 ## [return]: The actual change applied to the stat
-func apply() -> float:
+func apply(_apply_value:float = 0.0) -> float:
 	if not is_valid(): return 0.0
-	if is_applied() and _apply_only_once: 
-		push_warning("Attempted to reapply a one-time composite modifier")
-		return 0.0
-	
 	var ref_value = _ref_value()
-	# Apply the modifier and track the applied value
-	var actual_change = _apply_stat_modifier(_type, _stat, ref_value)
-	
-	if actual_change == 0.0: return 0.0
-	_is_applied = true
-	_applied_value += actual_change
-	return actual_change
+	return super.apply(ref_value)
 
 ## Simulates the effect of applying this modifier without changing the actual stat
 ## [return]: A dictionary containing predicted changes to the stat
