@@ -13,6 +13,8 @@ enum StatModifierType {
     MAX_FLAT, ## Max flat modifier
     MAX_PERCENT, ## Max percent modifier
     MIN_VALUE, ## Min value modifier
+    PERCENT_NORMALIZED, ## Percent normalized modifier value can be between 0 and 1
+    MAX_PERCENT_NORMALIZED ## Max percent normalized modifier value can be between 0 and 1
 }
 
 ## Name of the stat this modifier affects.
@@ -141,6 +143,10 @@ func _apply_stat_modifier(type, stat, value) -> float:
             actual_change = stat.add_max_value(value)
         StatModifierType.MIN_VALUE:
             actual_change = stat.add_min_value(value)
+        StatModifierType.PERCENT_NORMALIZED:
+            actual_change = stat.add_percent(value * 100.0)
+        StatModifierType.MAX_PERCENT_NORMALIZED:
+            actual_change = stat.add_max_percent(value * 100.0)
     return actual_change
 
 ## Returns a duplicate of the stat with the modifier applied.

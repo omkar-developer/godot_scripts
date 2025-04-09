@@ -78,7 +78,7 @@ func convert_to_godot_expression(expression: String) -> String:
 		var stat_name = match_result.get_string(1)
 		var stat_type_str = match_result.get_string(2)
 		
-		if stat_type_str.empty():
+		if stat_type_str.is_empty():
 			stat_type_str = "value"  # Default to value if no type specified
 			
 		var stat_type = _string_to_stat_type(stat_type_str)
@@ -93,15 +93,17 @@ func convert_to_godot_expression(expression: String) -> String:
 ## [param expression_str]: Math expression with stat references
 ## [return]: True if the expression was successfully parsed
 func set_expression(expression_str: String) -> bool:
+	if not _current_expression_string.is_empty() and expression_str != _current_expression_string:
+		clear()
 	# First make sure all referenced stats are added
-	add_ref_stats_from_expression(expression_str)
+	var stat_names = add_ref_stats_from_expression(expression_str)
 	
 	# Convert expression to Godot-compatible format
 	var godot_expr_str = convert_to_godot_expression(expression_str)
 	
 	# Create and parse the expression
 	var expression = Expression.new()
-	var error = expression.parse(godot_expr_str, [])
+	var error = expression.parse(godot_expr_str, stat_names)
 	if error != OK:
 		push_error("RefStatManager: Failed to parse expression: %s (error code %d)" % [godot_expr_str, error])
 		return false
@@ -118,15 +120,14 @@ func evaluate_current_expression() -> Variant:
 		push_error("RefStatManager: No expression has been set")
 		return null
 	
-	# Build variable dictionary for evaluation
-	var variables = {}
+	# Build variable list for evaluation
+	var variables = []
 	for ref_key in _ref_stats:
 		var entry = _ref_stats[ref_key]
-		var expr_var_name = create_expression_var_name(entry.path, entry.type)
-		variables[expr_var_name] = entry.get_value()
+		variables.append(entry.get_value())
 	
 	# Evaluate the expression with the variable values
-	var result = _current_expression.execute([], variables)
+	var result = _current_expression.execute(variables)
 	if _current_expression.has_execute_failed():
 		push_error("RefStatManager: Failed to execute expression: %s" % _current_expression_string)
 		return null
@@ -137,6 +138,8 @@ func evaluate_current_expression() -> Variant:
 ## [param expression_str]: Math expression with stat references
 ## [return]: The result of evaluating the expression, or null if evaluation failed
 func evaluate_expression(expression_str: String) -> Variant:
+	if _current_expression_string == expression_str:
+		return evaluate_current_expression()
 	if not set_expression(expression_str):
 		return null
 	return evaluate_current_expression()
