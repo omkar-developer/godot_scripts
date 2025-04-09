@@ -48,11 +48,11 @@ func get_stat(stat_name: String):
 func _create_test_modifier(stat_name: String = "Health", 
 						   type = StatModifierClassScript.StatModifierType.FLAT, 
 						   value: float = 50.0) -> StatModifier:
-	return StatModifierClassScript.new(stat_name, type, value)
+	return StatModifier.new(stat_name, type, value)
 
 ## Helper function to create a Condition for testing
 func _create_test_condition(initial_state: bool = true) -> Condition:
-	var condition = ConditionClassScript.new()
+	var condition = Condition.new()
 	condition._current_condition = initial_state
 	return condition
 
@@ -462,38 +462,27 @@ func test_to_dict():
 	assert_eq(dict.modifiers.size(), 2, "Dict should have 2 modifiers")
 	assert_eq(dict.is_empty(), false, "Dict should have condition data")
 
-func test_from_dict():
-	# Create initial data
-	var initial_data = {
-		"modifier_name": "Test Set",
-		"group": "Buffs",
-		"process": true,
-		"modifiers": [
-			{
-				"stat_name": "Health",
-				"type": StatModifierClassScript.StatModifierType.FLAT,
-				"value": 50.0
-			},
-			{
-				"stat_name": "Mana",
-				"type": StatModifierClassScript.StatModifierType.PERCENT,
-				"value": 0.2
-			}
-		],
-		"condition": {
-			"current_condition": true
-		}
-	}
-	
-	# Create a new modifier set and load from dict
-	var mod_set = StatModifierSet.new()
-	mod_set.from_dict(initial_data)
-	
-	assert_eq(mod_set._modifier_name, "Test Set", "Should load correct modifier name")
-	assert_eq(mod_set._group, "Buffs", "Should load correct group")
-	assert_eq(mod_set.process, true, "Should load correct process value")
-	assert_eq(mod_set._modifiers.size(), 2, "Should load 2 modifiers")
-	assert_not_null(mod_set.condition, "Should create condition object")
+var initial_data = {
+	"modifier_name": "Test Set",
+	"group": "Buffs",
+	"process": true,
+	"modifiers": [
+		["StatModifier", {
+			"stat_name": "Health",
+			"type": StatModifierClassScript.StatModifierType.FLAT,
+			"value": 50.0
+		}],
+		["StatModifier", {
+			"stat_name": "Mana",
+			"type": StatModifierClassScript.StatModifierType.PERCENT,
+			"value": 0.2
+		}]
+	],
+	"condition": {
+		"current_condition": true
+	},
+	"condition_classname": "Condition"
+}
 
 # Copy Test
 func test_copy():

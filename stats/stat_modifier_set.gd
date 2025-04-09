@@ -1,8 +1,10 @@
 extends Resource
 
-#TODO: also add signal based system for stat changes
 ## A class that represents a set of stat _modifiers and provides methods to manage and apply them.
 class_name StatModifierSet
+
+signal on_effect_apply # Signal emitted when an effect is applied to a stat.
+signal on_effect_remove # Signal emitted when an effect is removed from a stat. 
 
 ## Array of _modifiers in this set.
 @export var _modifiers: Array[StatModifier] = []
@@ -31,13 +33,22 @@ var _marked_for_deletion := false
 var _parent: Object
 
 ## apply as soon as initialized or added to the list
-var _apply := true
+@export var _apply := true
 ## remove effect when uninit
-var _remove_all := true
+@export var _remove_all := true
 ## apply effect when condition is true when initializing 
-var _condition_apply_on_start := true
+@export var _condition_apply_on_start := true
 ## pause process when condition is false and vice versa
-var _condition_pause_process := false
+@export var _condition_pause_process := false
+
+static var modifier_types = {
+	"StatModifierComposite": StatModifierComposite,
+	"StatModifier": StatModifier,
+}
+
+static var condition_types = {
+	"Condition": Condition,
+}
 
 ## Return the modifer name
 func get_modifier_name() -> String:
@@ -125,15 +136,20 @@ func find_mod_for_stat(stat_name: String) -> StatModifier:
 func _apply_effect() -> void:
 	for mod in _modifiers:
 		mod.apply()
+	on_effect_apply.emit()
 
 ## Removes all _modifiers in this set from the _parent.
 func _remove_effect() -> void:
 	for mod in _modifiers:
 		mod.remove()
+	on_effect_remove.emit()
 
 ## Initializes all _modifiers in this set with the given _parent.[br]
 ## [param _parent]: The _parent to initialize the _modifiers with.
 func init_modifiers(parent: Object) -> void:
+	if _parent != null: 
+		push_error("Attempted to set new parent while already initialized without uninitializing first.")
+		return
 	if parent == null: return
 	if not parent.has_method("get_stat"): return
 	_parent = parent
@@ -162,7 +178,7 @@ func uninit_modifiers() -> void:
 ## Adds a modifier to this set.[br]
 ## [param mod]: The modifier to add.
 func add_modifier(mod: StatModifier) -> StatModifier:
-	if _marked_for_deletion or _parent == null or mod == null: return null
+	if _marked_for_deletion or mod == null: return null
 	var mod2 = mod.duplicate(true)
 	_modifiers.append(mod2)
 	mod2.init_stat(_parent)
@@ -234,25 +250,46 @@ func copy() -> StatModifierSet:
 ## Returns a dictionary representation of this modifier set.
 func to_dict() -> Dictionary:
 	return {
-		"modifiers": _modifiers.map(func(m): return m.to_dict()),
+		"modifiers": _modifiers.map(func(m: StatModifier):
+			return {"class_name": m.get_class_name(),"data": m.to_dict()}),
 		"modifier_name": _modifier_name,
 		"group": _group,
 		"process": process,
 		"condition": condition.to_dict() if condition else {},
+		"condition_class": condition.get_class_name() if condition else ""
 	}
 
 ## Loads this modifier set from a dictionary.
 func from_dict(data: Dictionary) -> void:
 	_modifiers.assign(data.get("modifiers", []).map(
-		func(m_data): 
-			var m = StatModifier.new()
-			m.from_dict(m_data)
+		func(m_data: Dictionary): 
+			var m = _instantiate_modifier(m_data.get("class_name", ""))
+			m.from_dict(m_data["data"])
 			return m
 	))
+	
 	_modifier_name = data.get("modifier_name", "")
 	_group = data.get("group", "")
 	process = data.get("process", false)
 
-	if data.get("condition", null):
-		condition = Condition.new()
+	if data.has("condition_class"):
+		condition = _instantiate_condition(data["condition_class"])
 		condition.from_dict(data["condition"])
+
+func _instantiate_modifier(modifier_type: String) -> StatModifier:
+	if modifier_type in modifier_types:
+		return modifier_types[modifier_type].new()
+	else:
+		push_warning("Unknown modifier type: %s, defaulting to StatModifier." % modifier_type)
+		return StatModifier.new()
+
+func _instantiate_condition(condition_type: String) -> Condition:
+	if condition_type in condition_types:
+		return condition_types[condition_type].new()
+	else:
+		push_warning("Unknown condition type: %s, defaulting to Condition." % condition_type)
+		return Condition.new()
+
+## Returns the class name of this modifier set.
+func get_class_name() -> String:
+	return "StatModifierSet"

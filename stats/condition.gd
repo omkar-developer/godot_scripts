@@ -231,3 +231,7 @@ func from_dict(data: Dictionary):
 	_math_expression = data.get("math_expression", "")
 	_current_condition = data.get("current_condition", false)
 	_timer = data.get("timer", 0.0)
+
+## Returns the class name of this condition.
+func get_class_name() -> String:
+	return "Condition"
