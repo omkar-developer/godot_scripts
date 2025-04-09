@@ -14,97 +14,97 @@ var _parent: Object
 var _modules: Array[BMModule] = []
 
 func _enter_tree() -> void:
-    if _parent == null:
-        _parent = get_parent()
+	if _parent == null:
+		_parent = get_parent()
 
 ## Add a module to the manager
 func add_module(module: BMModule) -> void:
-    if not _modules.has(module):
-        _modules.append(module)
-        module.init(self)
+	if not _modules.has(module):
+		_modules.append(module)
+		module.init(self)
 
 ## Remove a module from the manager
 func remove_module(module: BMModule) -> void:
-    if _modules.has(module):
-        module.uninit()
-        _modules.erase(module)
+	if _modules.has(module):
+		module.uninit()
+		_modules.erase(module)
 
 ## Apply a modifier
 ## Returns true if successfully applied
-func apply_modifier(_modifier: StatModifierSet) -> bool:
-    var modifier = _modifier.copy()
-    # Let modules handle pre-application
-    for module in _modules:
-        if not module.on_before_apply(modifier):
-            return false
-    
-    var modifier_name = modifier.get_modifier_name()
-    
-    # Initialize and store modifier    
-    if has_modifier(modifier_name):
-        _active_modifiers[modifier_name].merge_mod(modifier)
-    else:
-        modifier.init_modifiers(_parent)
-        _active_modifiers[modifier_name] = modifier
-    
-    # Let modules handle post-application
-    for module in _modules:
-        module.on_after_apply(modifier)
-    
-    modifier_applied.emit(modifier_name, modifier)
-    return true
+func apply_modifier(_modifier: StatModifierSet, copy: bool = true) -> bool:
+	var modifier = _modifier.copy() if copy else _modifier
+	# Let modules handle pre-application
+	for module in _modules:
+		if not module.on_before_apply(modifier):
+			return false
+	
+	var modifier_name = modifier.get_modifier_name()
+	
+	# Initialize and store modifier    
+	if has_modifier(modifier_name):
+		_active_modifiers[modifier_name].merge_mod(modifier)
+	else:
+		modifier.init_modifiers(_parent)
+		_active_modifiers[modifier_name] = modifier
+	
+	# Let modules handle post-application
+	for module in _modules:
+		module.on_after_apply(modifier)
+	
+	modifier_applied.emit(modifier_name, modifier)
+	return true
 
 ## Remove a specific modifier
 func remove_modifier(modifier_name: String) -> void:
-    if not has_modifier(modifier_name):
-        return
-    
-    var modifier = _active_modifiers[modifier_name]
-    
-    # Let modules handle pre-removal
-    for module in _modules:
-        module.on_before_remove(modifier)
-    
-    modifier.delete()
-    _active_modifiers.erase(modifier_name)
-    
-    # Let modules handle post-removal
-    for module in _modules:
-        module.on_after_remove(modifier)
-    
-    modifier_removed.emit(modifier_name, modifier)
+	if not has_modifier(modifier_name):
+		return
+	
+	var modifier = _active_modifiers[modifier_name]
+	
+	# Let modules handle pre-removal
+	for module in _modules:
+		module.on_before_remove(modifier)
+	
+	modifier.delete()
+	_active_modifiers.erase(modifier_name)
+	
+	# Let modules handle post-removal
+	for module in _modules:
+		module.on_after_remove(modifier)
+	
+	modifier_removed.emit(modifier_name, modifier)
 
 ## Get active modifier by name
 func get_modifier(modifier_name: String) -> StatModifierSet:
-    return _active_modifiers.get(modifier_name)
+	return _active_modifiers.get(modifier_name)
 
 ## Check if a modifier is currently active
 func has_modifier(modifier_name: String) -> bool:
-    return _active_modifiers.has(modifier_name)
+	return _active_modifiers.has(modifier_name)
 
 ## Clear all modifiers
 func clear_all_modifiers() -> void:
-    var names = _active_modifiers.keys()
-    for modifier_name in names:
-        remove_modifier(modifier_name)
+	var names = _active_modifiers.keys()
+	for modifier_name in names:
+		remove_modifier(modifier_name)
 
 ## Process method for updating modifiers
 func _process(delta: float) -> void:
-    var to_remove: Array = []
-    
-    # Update modifiers
-    for modifier_name in _active_modifiers:
-        var modifier = _active_modifiers[modifier_name]
-        if modifier.is_marked_for_deletion():
-            to_remove.append(modifier_name)
-            continue
-        elif modifier.process:
-            modifier._process(delta)
-    
-    # Update modules
-    for module in _modules:
-        module.process(delta)
-    
-    # Remove finished modifiers
-    for modifier_name in to_remove:
-        remove_modifier(modifier_name)
+	var to_remove: Array = []
+	
+	# Update modifiers
+	for modifier_name in _active_modifiers:
+		var modifier = _active_modifiers[modifier_name]
+		if modifier.is_marked_for_deletion():
+			to_remove.append(modifier_name)
+			continue
+		elif modifier.process:
+			modifier._process(delta)
+	
+	# Update modules
+	for module in _modules:
+		module.process(delta)
+	
+	# Remove finished modifiers
+	for modifier_name in to_remove:
+		remove_modifier(modifier_name)
