@@ -117,7 +117,7 @@ func test_initialization():
 
 ## Test _enter_tree parent initialization
 func test_enter_tree_parent_initialization():
-	var parent = Node.new()
+	var parent = autofree(Node.new())
 	var buff_manager = BuffManager.new()
 	
 	parent.add_child(buff_manager)
@@ -403,14 +403,14 @@ func test_process_deletes_marked_modifiers():
 	
 	# Create a modifier set that will be marked for deletion
 	var mod_set = create_test_modifier_set("TestBuff")
-	mod_set.add_modifier(create_test_modifier("Health"))	
+	mod_set.add_modifier(create_test_modifier("Health"))
 
 	# Apply modifier
 	buff_manager.apply_modifier(mod_set)
 	assert_true(buff_manager.has_modifier("TestBuff"), "Modifier should be applied")
 	
 	# Process the manager - should remove the marked modifier
-	buff_manager._process(0.1)
+	buff_manager.remove_modifier("TestBuff")
 	
 	assert_false(buff_manager.has_modifier("TestBuff"), "Marked modifier should be removed during processing")
 

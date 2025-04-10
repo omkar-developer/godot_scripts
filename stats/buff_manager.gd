@@ -100,6 +100,8 @@ func _process(delta: float) -> void:
 			continue
 		elif modifier.process:
 			modifier._process(delta)
+			if modifier.is_marked_for_deletion():
+				to_remove.append(modifier_name)
 	
 	# Update modules
 	for module in _modules:
