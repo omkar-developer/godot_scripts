@@ -74,6 +74,37 @@ func remove_modifier(modifier_name: String) -> void:
 	
 	modifier_removed.emit(modifier_name, modifier)
 
+## Remove all modifiers in a specific group
+func remove_group_modifiers(group: String) -> void:
+	var to_remove = []
+	for modifier_name in _active_modifiers:
+		if _active_modifiers[modifier_name]._group == group:
+			to_remove.append(modifier_name)
+	
+	for modifier_name in to_remove:
+		remove_modifier(modifier_name)
+
+## Get all active modifiers in a specific group
+func get_group_modifiers(group: String) -> Array[StatModifierSet]:
+	var modifiers: Array[StatModifierSet] = []
+	for modifier in _active_modifiers.values():
+		if modifier._group == group:
+			modifiers.append(modifier)
+	return modifiers
+
+## Check if a group has any active modifiers
+func has_group_modifiers(group: String) -> bool:
+	for modifier in _active_modifiers.values():
+		if modifier._group == group:
+			return true
+	return false
+
+## Clear all modifiers
+func clear_all_modifiers() -> void:
+	var names = _active_modifiers.keys()
+	for modifier_name in names:
+		remove_modifier(modifier_name)
+
 ## Get active modifier by name
 func get_modifier(modifier_name: String) -> StatModifierSet:
 	return _active_modifiers.get(modifier_name)
@@ -81,12 +112,6 @@ func get_modifier(modifier_name: String) -> StatModifierSet:
 ## Check if a modifier is currently active
 func has_modifier(modifier_name: String) -> bool:
 	return _active_modifiers.has(modifier_name)
-
-## Clear all modifiers
-func clear_all_modifiers() -> void:
-	var names = _active_modifiers.keys()
-	for modifier_name in names:
-		remove_modifier(modifier_name)
 
 ## Process method for updating modifiers
 func _process(delta: float) -> void:
