@@ -27,7 +27,7 @@ var cached_value := 0.0
 var cached_max := 0.0
 
 ## Whether signals are enabled for value changes
-var enable_signal := true:
+@export var enable_signal := true:
 	set(value):
 		enable_signal = value
 		on_value_changed()

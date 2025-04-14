@@ -2,9 +2,9 @@ extends BMModule
 class_name BMMResistance
 
 ## Dictionary of modifier immunities and their durations
-var _immunities: Dictionary = {}
+@export var _immunities: Dictionary[String, float] = {}
 ## Dictionary of modifier resistances (0-100%)
-var _resistances: Dictionary = {}
+@export var _resistances: Dictionary[String, float] = {}
 
 ## Add temporary immunity
 func add_immunity(modifier_name: String, duration: float) -> void:

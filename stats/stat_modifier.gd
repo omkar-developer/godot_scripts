@@ -39,8 +39,8 @@ enum StatModifierType {
 var _stat: Stat
 
 ## Is this modifier currently applied
-var _is_applied := false
-var _applied_value := 0.0
+@export_storage var _is_applied := false
+@export_storage var _applied_value := 0.0
 
 ## Initializes the modifier with the provided stat name, type, and value.
 func _init(stat_name: String = "", type: StatModifierType = StatModifierType.FLAT, value: float = 0.0) -> void:

@@ -42,19 +42,19 @@ enum MergeType {
 @export var total_ticks:= -1
 
 ## Current time since creation.
-var timer := 0.0
+@export_storage var timer := 0.0
 
 ## Current time since last tick.
-var tick_timer := 0.0
+@export_storage var tick_timer := 0.0
 
 ## Number of times the effect has been applied.
-var ticks := 0
+@export_storage var ticks := 0
 
 ## Custom function for merging logic.
 var merge_function: Callable
 
 ## Whether this modifier set is currently running.
-var running := false
+@export_storage var running := false
 
 ## Initialize a new timed modifier set with the given parameters.[br]
 ## [param modifier_name]: The name of this modifier set.[br]

@@ -7,11 +7,11 @@ signal modifier_applied(modifier_name: String, modifier: StatModifierSet)
 signal modifier_removed(modifier_name: String, modifier: StatModifierSet)
 
 ## Dictionary of active modifiers
-var _active_modifiers: Dictionary = {}
+@export_storage var _active_modifiers: Dictionary = {}
 ## Parent entity reference
 var _parent: Object
 ## Array of attached modules
-var _modules: Array[BMModule] = []
+@export_storage var _modules: Array[BMModule] = []
 
 func _enter_tree() -> void:
 	if _parent == null:

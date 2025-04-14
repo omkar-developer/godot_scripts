@@ -44,9 +44,6 @@ var _ref_stat : Stat
 ## Manager for handling multiple reference stats in expressions
 var _ref_stat_manager : RefStatManager = null
 
-## Multiplier applied to the final calculated value (inherited from base class)
-var multiplier : float = 1.0
-
 ## Calculates the value based on the reference stat according to the selected type
 func _ref_value() -> float:
 	if _ref_stat_type == RefStatType.EXPRESSION:

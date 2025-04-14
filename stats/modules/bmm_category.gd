@@ -9,7 +9,7 @@ enum Category {
 }
 
 ## Dictionary mapping modifiers to categories
-var _categories: Dictionary = {}
+@export var _categories: Dictionary[String, Category] = {}
 
 ## Set category for a modifier
 func set_category(modifier_name: String, category: Category) -> void:

@@ -27,7 +27,7 @@ signal on_effect_remove # Signal emitted when an effect is removed from a stat.
 @export var apply_on_condition_change := true
 @export var remove_on_condition_change := true
 
-var _marked_for_deletion := false
+@export_storage var _marked_for_deletion := false
 
 ## The _parent object associated with this modifier set.
 var _parent: Object

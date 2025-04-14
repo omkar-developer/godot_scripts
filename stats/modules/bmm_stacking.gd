@@ -7,7 +7,7 @@ const STACK_BEHAVIOR_ADD = 1
 const STACK_BEHAVIOR_INDEPENDENT = 2
 
 ## Dictionary tracking modifier stacks
-var _stacks: Dictionary = {}
+@export_storage var _stacks: Dictionary = {}
 
 ## Array of stack configurations
 @export var stack_configs: Array[StackConfig] = []

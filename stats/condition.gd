@@ -58,9 +58,9 @@ var _ref_stat1: Stat
 ## Reference to the second stat.
 var _ref_stat2: Stat
 ## Current state of the condition (true/false).
-var _current_condition: bool = false
+@export_storage var _current_condition: bool = false
 ## Timer for managing cooldown.
-var _timer := 0.0
+@export_storage var _timer := 0.0
 ## Parsed math expression (used with `ConditionType.MATH_EXPRESSION`).
 var _expression: Expression = null
 
