@@ -1,103 +1,282 @@
-# UpgradeTrack.gd
+## Manages the progression of a single upgrade track, handling XP, levels,
+## requirements, and applying modifiers.[br]
+## Tracks experience points ([member current_xp]) and [member current_level] for a specific upgrade ([member upgrade_name]).[br]
+## Can automatically apply upgrades ([member auto_upgrade]) when requirements (XP, materials) are met,
+## or allow manual triggering. Applies [StatModifierSet] resources defined in [UpgradeLevelConfig]
+## resources ([member level_configs]) for each level. Emits signals for various events like leveling up ([signal upgrade_applied]),
+## reaching max level ([signal max_level_reached]), or hitting defined step levels ([signal step_reached]).[br]
+## Also provides a preview system for the effects of the next available upgrade ([method has_preview], [method simulate_next_effect]).
 extends Resource
-class_name UpgradeTrack
+class_name Upgrade
 
+## Emitted when an upgrade is successfully applied.[br]
+## Passes the [param new_level] that was just reached and the [param applied_config] ([UpgradeLevelConfig]) for that level.
 signal upgrade_applied(new_level: int, applied_config: UpgradeLevelConfig)
+
+## Emitted when the modifiers of the previous level are removed (typically just before applying the next level's).[br]
+## Passes the [param removed_level] index (the level whose effects were removed) and the corresponding [param removed_config] ([UpgradeLevelConfig]).
 signal upgrade_removed(removed_level: int, removed_config: UpgradeLevelConfig)
+
+## Emitted when the maximum level defined in [member level_configs] is reached.
 signal max_level_reached()
+
+## Emitted when a level defined in the [member step_levels] array is reached.[br]
+## Passes the specific [param step_level] number that was reached.
 signal step_reached(step_level: int)
 
+## Emitted when the [method do_refund] method is called.[br]
+## Passes the total amount of XP and materials refunded.
+signal refund_applied(xp: int, materials: Dictionary)
+
+## The display name of the upgrade track.
 @export var upgrade_name: String = ""
+## A description of the upgrade track's purpose or effect.
 @export var description: String = ""
+## If [code]true[/code], automatically attempts to upgrade whenever XP is added and requirements are met via [method add_xp].[br]
+## If [code]false[/code], an upgrade must be triggered manually (e.g., via a UI button calling [method try_upgrade]).
 @export var auto_upgrade: bool = true
+## An array of [UpgradeLevelConfig] resources defining the requirements and effects for each level.[br]
+## The order in this array determines the level progression (index 0 is level 1's config, index 1 is level 2's, etc.).
 @export var level_configs: Array[UpgradeLevelConfig] = []
+## An array of specific level numbers that trigger the [signal step_reached] signal when achieved.
 @export var step_levels: Array[int] = []
 
+## The current level of this upgrade track. Starts at 0 (meaning no levels completed). Level 1 is the first upgrade.
 @export var current_level: int = 0
+## The current accumulated experience points towards the next level.
 @export var current_xp: int = 0
 
-var _current_modifier: StatModifierSet = null
+## The [StatModifierSet] currently applied by this upgrade track. Internal use.
+@export_storage var _current_modifier: StatModifierSet = null
+## The owner object whose stats will be modified. Must be set via [method init].
 var _stat_owner: Object = null
-var _inventory: Inventory = null
 
-func init(stat_owner: Object, inventory: Inventory) -> void:
+## must have: func has_materials(required_materials: Dictionary) -> bool [br]
+## func consume_materials(required_materials: Dictionary) -> bool [br]
+## The inventory system used to check and consume required materials. Must be set via [method init].
+var _inventory: Object = null # Assuming an Inventory class/script exists
+
+## Initializes the UpgradeTrack with necessary dependencies.[br]
+## [b]Must[/b] be called before adding XP or attempting upgrades.[br]
+## [param stat_owner]: The object whose stats this track will modify (passed to [method StatModifierSet.init_modifiers]).[br]
+## [param inventory]: The [Inventory] node used for material checks and consumption.[br]
+func init_upgrade(stat_owner: Object, inventory: Object) -> void:    
+	assert(is_instance_valid(stat_owner), "UpgradeTrack.init: stat_owner must be a valid object.")
+	assert(is_instance_valid(inventory), "UpgradeTrack.init: inventory must be a valid object.")
+	assert(inventory.has_method("has_materials"), "Inventory must have a has_materials method.")
+	assert(inventory.has_method("consume_materials"), "Inventory must have a consume_materials method.")
+	assert(stat_owner.has_method("get_stat"), "parent must have get_stat method")
 	_stat_owner = stat_owner
 	_inventory = inventory
 
+## Adds experience points to the track.[br]
+## If [member auto_upgrade] is [code]true[/code], it will attempt to level up if requirements are met by calling [method _do_upgrade].[br]
+## [param amount]: The amount of XP to add. Should be non-negative.[br]
 func add_xp(amount: int) -> void:
+	if amount <= 0:
+		printerr("UpgradeTrack: Cannot add negative or zero XP.")
+		return
+	if _is_max_level(): # Don't add XP if already max level
+		return
+
 	current_xp += amount
 	if auto_upgrade:
 		while _can_upgrade():
 			_do_upgrade()
 
+## Gets the XP required to reach the next level (complete the current level).[br]
+## Returns 0 if the track is already at the maximum level.[br]
+## [return]: The required XP defined in the [UpgradeLevelConfig] for the current target level, or 0 if max level reached.[br]
 func get_current_xp_required() -> int:
-	return 0 if current_level >= level_configs.size() else level_configs[current_level].xp_required
+	if _is_max_level():
+		return 0
+	# Check bounds before accessing
+	if current_level >= level_configs.size():
+		printerr("UpgradeTrack: current_level is out of bounds for level_configs in get_current_xp_required.")
+		return 9223372036854775807 # INT64_MAX in GDScript
+	return level_configs[current_level].xp_required
 
+## Calculates the progress towards the next level as a ratio between 0.0 and 1.0.[br]
+## Returns 1.0 if the required XP is 0 (e.g., at max level or if config has 0 XP).[br]
+## [return]: The progress ratio ([code]current_xp / required_xp[/code]), clamped between 0.0 and 1.0.[br]
 func get_progress_ratio() -> float:
 	var required = get_current_xp_required()
 	return clamp(float(current_xp) / required, 0.0, 1.0) if required > 0 else 1.0
 
+## Checks if the upgrade track can currently level up based on XP and material requirements.[br]
+## Internal use.[br]
+## [return]: [code]true[/code] if the track can level up, [code]false[/code] otherwise.[br]
 func _can_upgrade() -> bool:
 	if _is_max_level():
 		return false
 
-	var config := level_configs[current_level]
-	for mat in config.required_materials.keys():
-		if _inventory.get_material_quantity(mat) < config.required_materials[mat]:
-			return false
-	return current_xp >= config.xp_required
+	# Ensure level_configs has an entry for the current level
+	if current_level >= level_configs.size():
+		printerr("UpgradeTrack: Current level %d is out of bounds for level_configs (size %d)." % [current_level, level_configs.size()])
+		return false
 
-func _do_upgrade() -> void:
 	var config: UpgradeLevelConfig = level_configs[current_level]
 
-	remove_current_upgrade()
+	# Check materials
+	if config.required_materials and not config.required_materials.is_empty(): # Check if dictionary exists and is not empty
+		if not is_instance_valid(_inventory):
+			printerr("UpgradeTrack: Inventory not initialized or invalid!")
+			return false
+		if not _inventory.has_materials(config.required_materials):
+			return false
+
+	# Check XP
+	return current_xp >= config.xp_required
+
+## Performs the upgrade process.[br]
+## Removes previous modifiers, deducts materials and XP, applies new modifiers,
+## increments the level, and emits relevant signals. Internal use.
+func _do_upgrade() -> bool:
+	# Double check conditions before proceeding
+	if not _can_upgrade():
+		printerr("UpgradeTrack: _do_upgrade called when _can_upgrade is false.")
+		return false
+	if not is_instance_valid(_stat_owner) or not is_instance_valid(_inventory):
+		printerr("UpgradeTrack: Stat owner or inventory invalid during upgrade.")
+		return false
+
+	var config: UpgradeLevelConfig = level_configs[current_level]
 
 	# Deduct materials
-	for mat in config.required_materials.keys():
-		_inventory.remove_material(mat, config.required_materials[mat])
+	if config.required_materials:
+		if not _inventory.consume_materials(config.required_materials):
+			printerr("UpgradeTrack: Failed to consume required materials for upgrade.")
+			return false
 
-	# Apply modifiers
+	# Remove modifiers from the level we are leaving (if any were applied)
+	remove_current_upgrade()
+
+	# Apply new modifiers for the level being entered
 	if config.modifiers:
 		config.modifiers.init_modifiers(_stat_owner)
-		config.modifiers._apply_effect()  # Explicit apply
 		_current_modifier = config.modifiers
 
+	# Deduct XP and increment level
 	current_xp -= config.xp_required
-	current_level += 1
+	current_level += 1 # Increment level *after* processing the config for the completed level
 
-	emit_signal("upgrade_applied", current_level, config)
+	# Emit signals AFTER state is updated
+	# Pass the config of the level that was just *completed* / *applied*
+	emit_signal("upgrade_applied", current_level, config) # current_level is now the new level number
 
 	if step_levels.has(current_level):
 		emit_signal("step_reached", current_level)
 
 	if _is_max_level():
 		emit_signal("max_level_reached")
+	
+	return true
 
+## Removes the stat modifiers applied by the most recently completed level (if any).[br]
+## Calls [method StatModifierSet._remove_effect] and [method StatModifierSet.uninit_modifiers].[br]
+## Does [b]not[/b] emit the [signal upgrade_removed] signal; that is handled by [method _do_upgrade].
 func remove_current_upgrade() -> void:
 	if _current_modifier:
-		_current_modifier._remove_effect()
+		var config = level_configs[current_level]
 		_current_modifier.uninit_modifiers()
-		if current_level > 0:
-			emit_signal("upgrade_removed", current_level, level_configs[current_level - 1])
 		_current_modifier = null
+		emit_signal("upgrade_removed", current_level, config)
 
+## Checks if the current level is greater than or equal to the number of defined level configurations.[br]
+## Internal use.[br]
+## [return]: [code]true[/code] if the maximum level has been reached or exceeded, [code]false[/code] otherwise.[br]
 func _is_max_level() -> bool:
 	return current_level >= level_configs.size()
 
 # --- PREVIEW SYSTEM ---
 
+## Checks if there is a next level configuration with modifiers to preview.[br]
+## [return]: [code]true[/code] if not at max level and the next level config ([code]level_configs[current_level][/code]) has a valid [member UpgradeLevelConfig.modifiers] set.[br]
 func has_preview() -> bool:
-	return not _is_max_level() and level_configs[current_level].modifiers != null
+	# Check bounds first
+	if _is_max_level() or current_level < 0: # current_level should not be < 0, but safety check
+		return false
+	# Check if the config at the current level exists and has modifiers
+	return level_configs[current_level].modifiers != null
 
+## Gets the [StatModifierSet] associated with the *next* upgrade level configuration.[br]
+## Assumes [method has_preview] is true when calling.[br]
+## [return]: The [StatModifierSet] for the next level ([code]level_configs[current_level].modifiers[/code]), or [code]null[/code] if none exists or called inappropriately.[br]
 func get_preview_modifier_set() -> StatModifierSet:
+	if not has_preview():
+		printerr("UpgradeTrack: get_preview_modifier_set called when no preview is available.")
+		return null
+	# Bounds already checked by has_preview implicitly
 	return level_configs[current_level].modifiers
 
+## Simulates the effect of the next upgrade's modifiers without applying them permanently.[br]
+## Useful for displaying potential stat changes in UI.[br]
+## Requires the [StatModifierSet] class to have a [code]simulate_effect()[/code] method implemented.[br]
+## [return]: A [Dictionary] representing the simulated stat changes (structure depends on [StatModifierSet] implementation). Returns empty [Dictionary] ([code]{}[/code]) if no preview is available or method is missing.[br]
 func simulate_next_effect() -> Dictionary:
-	if not has_preview():
-		return {}
-	return get_preview_modifier_set().simulate_effect()
+	var preview_mod_set = get_preview_modifier_set()
+	if preview_mod_set and preview_mod_set.has_method("simulate_effect"):
+		return preview_mod_set.simulate_effect()
+	return {}
 
+## Gets temporarily applied stats from the next upgrade's modifiers for preview purposes.[br]
+## Useful for previewing effects that might involve temporary status applications.[br]
+## Requires the [StatModifierSet] class to have a [code]get_temp_applied_stat()[/code] method implemented.[br]
+## [return]: An [Array] representing temporary stats (structure depends on [StatModifierSet] implementation). Returns empty [Array] ([code][][/code]) if no preview is available or method is missing.[br]
 func get_temp_applied_stats() -> Array:
-	if not has_preview():
-		return []
-	return get_preview_modifier_set().get_temp_applied_stat()
+	var preview_mod_set = get_preview_modifier_set()
+	if preview_mod_set and preview_mod_set.has_method("get_temp_applied_stat"):
+		return preview_mod_set.get_temp_applied_stat()
+	return []
+
+## Calculates the XP and material refund for the current level (if any).[br]
+## [return]: A [Dictionary] with keys "xp" and "materials".
+func get_total_refund() -> Dictionary:
+	var xp_refund := current_xp
+	var material_refund := {}
+
+	for i in range(current_level):
+		var config := level_configs[i]
+
+		xp_refund += config.xp_required
+
+		for mat in config.required_materials:
+			material_refund[mat] = material_refund.get(mat, 0) + config.required_materials[mat]
+
+	return {
+		"xp": xp_refund,
+		"materials": material_refund
+	}
+
+## Refunds the player's XP and materials for the current level (if any).
+## [return]: The total amount of XP refunded.
+func do_refund() -> int:
+	# First, get all refundable materials and XP from inventory
+	var refund_data := get_total_refund()
+	
+	# Return all consumed materials to the player's inventory
+	if not refund_data.materials.is_empty():
+		if _inventory.has_method("store_materials"):
+			_inventory.store_materials(refund_data.materials)
+		else:
+			printerr("UpgradeTrack: Inventory does not have a store_materials method.")
+			return 0
+	
+	# Reset XP back to 0
+	current_xp = 0
+	current_level = 0
+	
+	# Emit the refund signal with total amount
+	emit_signal("refund_applied",
+		refund_data.xp,
+		refund_data.materials
+	)
+	return refund_data.xp
+
+## Resets the upgrade to its initial state (level 0, 0 XP).[br]
+## Removes any currently applied modifiers.[br]
+## [color=yellow]Warning:[/color] This does not refund spent materials or XP.
+func reset_upgrades() -> void:
+	remove_current_upgrade() # Remove modifiers from the current level
+	current_level = 0
+	current_xp = 0

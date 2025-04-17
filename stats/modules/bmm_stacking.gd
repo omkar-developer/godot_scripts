@@ -2,9 +2,8 @@ extends BMModule
 class_name BMM_Stacking
 
 ## Stack behavior options
-const STACK_BEHAVIOR_REFRESH = 0
-const STACK_BEHAVIOR_ADD = 1
-const STACK_BEHAVIOR_INDEPENDENT = 2
+const STACK_BEHAVIOR_MERGE  = 0
+const STACK_BEHAVIOR_INDEPENDENT = 1
 
 ## Dictionary tracking modifier stacks
 @export_storage var _stacks: Dictionary = {}
@@ -37,14 +36,6 @@ func on_before_apply(modifier: StatModifierSet) -> bool:
 		
 	# Handle stacking behavior
 	match config.stack_behavior:
-		STACK_BEHAVIOR_REFRESH:
-			var existing = manager.get_modifier(modifier_name)
-			existing.merge_mod(modifier)
-		STACK_BEHAVIOR_ADD:
-			var existing = manager.get_modifier(modifier_name)
-			if existing is StatModifierSetTimed and modifier is StatModifierSetTimed:
-				existing.duration += modifier.duration
-			existing.merge_mod(modifier)
 		STACK_BEHAVIOR_INDEPENDENT:
 			modifier._modifier_name = modifier_name + str(_stacks[modifier_name])
 	

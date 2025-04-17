@@ -58,18 +58,6 @@ func test_initialization():
 	assert_eq(stacking_module._stacks.size(), 0, "Stacks dictionary should be empty on initialization")
 	assert_eq(stacking_module.stack_configs.size(), 0, "Stack configs array should be empty on initialization")
 
-## Test adding stack config
-func test_add_config():
-	var stacking_module = BMM_Stacking.new()
-	
-	# Add config
-	stacking_module.add_config("StackableBuff", 3, BMM_Stacking.STACK_BEHAVIOR_ADD)
-	
-	assert_eq(stacking_module.stack_configs.size(), 1, "Should have one stack config")
-	assert_eq(stacking_module.stack_configs[0].modifier_name, "StackableBuff", "Config should have correct modifier name")
-	assert_eq(stacking_module.stack_configs[0].max_stacks, 3, "Config should have correct max stacks")
-	assert_eq(stacking_module.stack_configs[0].stack_behavior, BMM_Stacking.STACK_BEHAVIOR_ADD, "Config should have correct behavior")
-
 ## Test get_stack_count
 func test_get_stack_count():
 	var stacking_module = BMM_Stacking.new()
@@ -92,7 +80,7 @@ func test_get_stack_config():
 	var stacking_module = BMM_Stacking.new()
 	
 	# Add config
-	stacking_module.add_config("ConfiguredBuff", 3, BMM_Stacking.STACK_BEHAVIOR_REFRESH)
+	stacking_module.add_config("ConfiguredBuff", 3, BMM_Stacking.STACK_BEHAVIOR_MERGE)
 	
 	# Get config for configured buff
 	var config = stacking_module._get_stack_config("ConfiguredBuff")
@@ -163,7 +151,7 @@ func test_on_before_apply_refresh_behavior():
 	stacking_module.init(buff_manager)
 	
 	# Add config with REFRESH behavior
-	stacking_module.add_config("RefreshBuff", 2, BMM_Stacking.STACK_BEHAVIOR_REFRESH)
+	stacking_module.add_config("RefreshBuff", 2, BMM_Stacking.STACK_BEHAVIOR_MERGE)
 	
 	# Create original modifier with Health +10
 	var original_mod = create_test_modifier_set("RefreshBuff")
