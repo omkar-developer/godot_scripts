@@ -182,7 +182,7 @@ func test_on_before_apply_add_behavior():
 	stacking_module.init(buff_manager)
 	
 	# Add config with ADD behavior
-	stacking_module.add_config("AddBuff", 3, BMM_Stacking.STACK_BEHAVIOR_ADD)
+	stacking_module.add_config("AddBuff", 3, BMM_Stacking.STACK_BEHAVIOR_MERGE)
 	
 	# Create original timed modifier with 10s duration
 	var original_mod = create_test_modifier_set_timed("AddBuff", 10.0)

@@ -28,10 +28,6 @@ signal step_reached(step_level: int)
 ## Passes the total amount of XP and materials refunded.
 signal refund_applied(xp: int, materials: Dictionary)
 
-## The display name of the upgrade track.
-@export var upgrade_name: String = ""
-## A description of the upgrade track's purpose or effect.
-@export var description: String = ""
 ## If [code]true[/code], automatically attempts to upgrade whenever XP is added and requirements are met via [method add_xp].[br]
 ## If [code]false[/code], an upgrade must be triggered manually (e.g., via a UI button calling [method try_upgrade]).
 @export var auto_upgrade: bool = true
@@ -47,7 +43,7 @@ signal refund_applied(xp: int, materials: Dictionary)
 @export var current_xp: int = 0
 
 ## The [StatModifierSet] currently applied by this upgrade track. Internal use.
-@export_storage var _current_modifier: StatModifierSet = null
+var _current_modifier: StatModifierSet = null
 ## The owner object whose stats will be modified. Must be set via [method init].
 var _stat_owner: Object = null
 
@@ -94,7 +90,11 @@ func get_current_xp_required() -> int:
 	if current_level >= level_configs.size():
 		printerr("UpgradeTrack: current_level is out of bounds for level_configs in get_current_xp_required.")
 		return 9223372036854775807 # INT64_MAX in GDScript
-	return level_configs[current_level].xp_required
+	return max(0, level_configs[current_level].xp_required - current_xp)
+
+## Gets the current level of the upgrade track.
+func get_current_level() -> int:
+	return current_level
 
 ## Calculates the progress towards the next level as a ratio between 0.0 and 1.0.[br]
 ## Returns 1.0 if the required XP is 0 (e.g., at max level or if config has 0 XP).[br]
@@ -127,6 +127,40 @@ func _can_upgrade() -> bool:
 
 	# Check XP
 	return current_xp >= config.xp_required
+
+
+## Sets the level of the upgrade track.[br]
+## Removes any previous modifiers and emits the [signal upgrade_removed] signal. Internal use.[br]
+## [param level]: The level to set the upgrade track to. Must be a positive integer.
+func set_level(level: int=1) -> bool:
+	if level <= 0:
+		printerr("UpgradeTrack: Cannot set level to a negative number or zero.")
+		return false
+	
+	if level > level_configs.size():
+		printerr("UpgradeTrack: Level %d is out of bounds for level_configs (size %d)." % [level, level_configs.size()])
+		return false
+
+	var config: UpgradeLevelConfig = level_configs[level - 1]
+
+	remove_current_upgrade()
+
+	if config.modifiers:
+		config.modifiers.init_modifiers(_stat_owner)
+		_current_modifier = config.modifiers
+	
+	current_xp = 0
+	current_level = level
+
+	emit_signal("upgrade_applied", current_level, config)
+
+	if step_levels.has(current_level):
+		emit_signal("step_reached", current_level)
+
+	if _is_max_level():
+		emit_signal("max_level_reached")
+	
+	return true
 
 ## Performs the upgrade process.[br]
 ## Removes previous modifiers, deducts materials and XP, applies new modifiers,
@@ -177,7 +211,7 @@ func _do_upgrade() -> bool:
 ## Does [b]not[/b] emit the [signal upgrade_removed] signal; that is handled by [method _do_upgrade].
 func remove_current_upgrade() -> void:
 	if _current_modifier:
-		var config = level_configs[current_level]
+		var config = level_configs[current_level - 1]
 		_current_modifier.uninit_modifiers()
 		_current_modifier = null
 		emit_signal("upgrade_removed", current_level, config)
@@ -248,7 +282,7 @@ func get_total_refund() -> Dictionary:
 		"materials": material_refund
 	}
 
-## Refunds the player's XP and materials for the current level (if any).
+## Refunds the player's XP and materials for the current level (if any) and resets the upgrade to the initial state (level 0, 0 XP) removing any currently applied modifiers.[br].
 ## [return]: The total amount of XP refunded.
 func do_refund() -> int:
 	# First, get all refundable materials and XP from inventory
@@ -263,8 +297,7 @@ func do_refund() -> int:
 			return 0
 	
 	# Reset XP back to 0
-	current_xp = 0
-	current_level = 0
+	reset_upgrades()
 	
 	# Emit the refund signal with total amount
 	emit_signal("refund_applied",
@@ -280,3 +313,44 @@ func reset_upgrades() -> void:
 	remove_current_upgrade() # Remove modifiers from the current level
 	current_level = 0
 	current_xp = 0
+
+## Converts the upgrade's current state to a dictionary for serialization.[br]
+## [return]: A [Dictionary] containing the upgrade's serializable state.
+func to_dict() -> Dictionary:
+	var data := {
+		"current_level": current_level,
+		"current_xp": current_xp,
+		"auto_upgrade": auto_upgrade,
+	}
+	
+	# Save current modifier state if exists
+	if _current_modifier:
+		data["current_modifier"] = _current_modifier.to_dict() if _current_modifier.has_method("to_dict") else {}
+		
+	return data
+
+## Restores the upgrade's state from a dictionary.[br]
+## [param data]: The [Dictionary] containing the upgrade state to restore.[br]
+## [return]: [code]true[/code] if successful, [code]false[/code] otherwise.
+func from_dict(data: Dictionary) -> bool:
+	# Check for required keys
+	if not data.has("current_level") or not data.has("current_xp") or not data.has("auto_upgrade"):
+		return false
+	
+	# Reset current state
+	reset_upgrades()
+	
+	# Restore values
+	auto_upgrade = data.get("auto_upgrade")
+	current_xp = data.get("current_xp")	
+
+	# Set level last as it will apply modifiers
+	if not set_level(data.get("current_level", 0)):
+		return false
+	
+	# Restore modifier state if present
+	var current_modifier_data = data.get("current_modifier")
+	if current_modifier_data and _current_modifier.has_method("from_dict"):
+		_current_modifier.from_dict(current_modifier_data)
+	
+	return true

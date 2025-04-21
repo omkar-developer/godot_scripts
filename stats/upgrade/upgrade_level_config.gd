@@ -13,3 +13,20 @@ class_name UpgradeLevelConfig
 
 ## A dictionary containing materials and their quantities required for this upgrade level.[br]
 @export var required_materials: Dictionary[StringName, int] = {}  # Example: { "wood": 5, "ore": 3 }
+
+## Converts the UpgradeLevelConfig to a dictionary.
+func to_dict() -> Dictionary:
+	var dict = {}
+	dict["xp_required"] = xp_required
+	dict["modifiers"] = modifiers.to_dict()
+	dict["required_materials"] = required_materials.duplicate()
+	return dict
+
+## Populates the UpgradeLevelConfig from a dictionary.
+func from_dict(dict: Dictionary) -> void:
+	xp_required = dict["xp_required"]
+	modifiers.from_dict(dict["modifiers"])
+	required_materials.clear()
+	for material in dict["required_materials"]:
+		var quantity = dict["required_materials"][material]
+		required_materials[material] = quantity

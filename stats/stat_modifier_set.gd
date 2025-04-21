@@ -212,6 +212,13 @@ func clear_modifiers() -> void:
 		mod.uninit_stat(_remove_all)
 	_modifiers.clear()
 
+## Clears all _modifiers in this set and uninitializes the condition.
+func clear_all() -> void:
+	clear_modifiers()
+	if condition != null:
+		condition.uninit_stat()
+		_disconnect_condition()
+
 ## Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta: float) -> void:
 	if condition != null:
@@ -256,15 +263,27 @@ func to_dict() -> Dictionary:
 		"group": _group,
 		"process": process,
 		"condition": condition.to_dict() if condition else {},
-		"condition_class": condition.get_class_name() if condition else ""
+		"condition_class": condition.get_class_name() if condition else "",
+		"marked_for_deletion": _marked_for_deletion,
+		"remove_all": _remove_all,
+		"merge_enabled": merge_enabled,
+		"condition_apply_on_start": _condition_apply_on_start,
+		"condition_pause_process": _condition_pause_process,
+		"apply_on_condition_change": apply_on_condition_change,
+		"remove_on_condition_change": remove_on_condition_change
 	}
 
 ## Loads this modifier set from a dictionary.
 func from_dict(data: Dictionary) -> void:
+	if data == null: return
+	
+	clear_all()
+	
 	_modifiers.assign(data.get("modifiers", []).map(
 		func(m_data: Dictionary): 
 			var m = _instantiate_modifier(m_data.get("class_name", ""))
 			m.from_dict(m_data["data"])
+			m.init_stat(_parent)
 			return m
 	))
 	
@@ -275,6 +294,16 @@ func from_dict(data: Dictionary) -> void:
 	if data.has("condition_class"):
 		condition = _instantiate_condition(data["condition_class"])
 		condition.from_dict(data["condition"])
+		condition.init_stat(_parent)
+		_connect_condition()
+
+	_marked_for_deletion = data.get("marked_for_deletion", false)
+	_remove_all = data.get("remove_all", false)
+	merge_enabled = data.get("merge_enabled", false)
+	_condition_apply_on_start = data.get("condition_apply_on_start", false)
+	_condition_pause_process = data.get("condition_pause_process", false)
+	apply_on_condition_change = data.get("apply_on_condition_change", false)
+	remove_on_condition_change = data.get("remove_on_condition_change", false)
 
 func _instantiate_modifier(modifier_type: String) -> StatModifier:
 	if modifier_type in modifier_types:

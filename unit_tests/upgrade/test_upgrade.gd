@@ -61,8 +61,6 @@ func before_each():
 	upgrade = Upgrade.new()
 	
 	# Define a simple system with 3 levels
-	upgrade.upgrade_name = "Test Upgrade"
-	upgrade.description = "A test upgrade for unit testing"
 	upgrade.auto_upgrade = false
 	
 	# Fix type mismatch with proper array typing

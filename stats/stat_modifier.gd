@@ -272,12 +272,12 @@ func to_dict() -> Dictionary:
 
 ## Loads this modifier from a dictionary.
 func from_dict(dict: Dictionary) -> void:
-	if dict.has("stat_name"): _stat_name = dict["stat_name"]
-	if dict.has("type"): _type = dict["type"]
-	if dict.has("value"): _value = dict["value"]
-	if dict.has("is_applied"): _is_applied = dict["is_applied"]
-	if dict.has("apply_only_once"): _apply_only_once = dict["apply_only_once"]
-	if dict.has("applied_value"): _applied_value = dict["applied_value"]
+	_stat_name = dict.get("stat_name", _stat_name)
+	_type = dict.get("type", _type)
+	_value = dict.get("value", _value)
+	_is_applied = dict.get("is_applied", _is_applied)
+	_apply_only_once = dict.get("apply_only_once", _apply_only_once)
+	_applied_value = dict.get("applied_value", _applied_value)
 
 ## Returns the class name of this modifier.
 func get_class_name() -> String:
