@@ -1,0 +1,13 @@
+[gd_scene load_steps=2 format=3 uid="uid://hhykurrrbv4e"]
+
+[ext_resource type="Script" uid="uid://nwrqx2lg5jtm" path="res://scripts/stats/ui/stats_view.gd" id="1_jamcg"]
+
+[node name="StatViewContainer" type="ScrollContainer"]
+custom_minimum_size = Vector2(256, 256)
+horizontal_scroll_mode = 0
+script = ExtResource("1_jamcg")
+
+[node name="StatsView" type="VBoxContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3

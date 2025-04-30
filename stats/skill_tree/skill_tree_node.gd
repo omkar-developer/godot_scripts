@@ -26,11 +26,13 @@ signal on_unlocked
 	set(value):
 		total_parents_level = value
 		if total_parents_level >= required_parent_level:
-			unlock_node_internal()
+			unlock()
 
+var skill_tree: SkillTree
 # --- Methods ---
 
-func init_node(stat_owner: Object, inventory: Object) -> void:
+func init_node(stat_owner: Object, inventory: Object = null, _skill_tree: SkillTree = null) -> void:
+	self.skill_tree = _skill_tree
 	if upgrade:
 		upgrade.init_upgrade(stat_owner, inventory)
 	else:
@@ -41,8 +43,18 @@ func is_unlocked() -> bool:
 	return unlocked
 
 # Mark the node as unlocked (called by SkillTree).
-func unlock_node_internal() -> void:
+func unlock() -> void:
 	unlocked = true
+
+# Attempt to upgrade the node's level.
+func upgrade_level() -> bool:
+	if skill_tree:
+		if skill_tree.skill_points < upgrade.get_current_xp_required():
+			return false
+	if upgrade.level_up():
+		if skill_tree: skill_tree.skill_points -= upgrade.get_current_xp_required()
+		return true
+	return false
 
 # Get the cost in XP points required for the next level (or level 1 if locked).
 func get_next_level_xp_cost() -> int:

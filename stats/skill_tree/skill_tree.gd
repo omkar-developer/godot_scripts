@@ -18,6 +18,14 @@ var _inventory: Object
 # Reference to the parent object
 var _parent: Object
 
+enum UnlockStrategy {
+	ALL_PARENTS_TOTAL_LEVEL,
+	ANY_PARENT_UNLOCKED,
+	EACH_PARENT_MIN_LEVEL
+}
+
+@export var unlock_strategy := UnlockStrategy.ALL_PARENTS_TOTAL_LEVEL
+
 # Constructor
 func _init(inventory = null):
 	_inventory = inventory
@@ -47,27 +55,44 @@ func add_connection(from_node_id: String, to_node_id: String) -> void:
 	if not _connections[from_node_id].has(to_node_id):
 		_connections[from_node_id].append(to_node_id)
 
-# Check if a node can be unlocked based on parent _nodes' requirements
 func can_unlock_node(node_id: String) -> bool:
 	if not _nodes.has(node_id):
 		return false
-	
-	# Check if node is already unlocked
-	if _nodes[node_id].is_unlocked():
+
+	var node = _nodes[node_id]
+	if node.is_unlocked():
 		return false
-	
-	# Check if all parent _nodes are unlocked to required level
+
 	var parent_nodes = get_parent_nodes(node_id)
-	
-	# Root _nodes have special handling - they can be unlocked directly
 	if parent_nodes.is_empty():
 		return true
-	
-	for parent_id in parent_nodes:
-		if not _nodes[parent_id].is_unlocked() or _nodes[parent_id].upgrade.current_level < _nodes[node_id].required_parent_level:
+
+	var strategy = unlock_strategy
+
+	match strategy:
+		UnlockStrategy.ALL_PARENTS_TOTAL_LEVEL:
+			var total_levels = 0
+			for parent_id in parent_nodes:
+				if not _nodes[parent_id].is_unlocked():
+					return false
+				total_levels += _nodes[parent_id].upgrade.current_level
+			return total_levels >= node.required_parent_level
+
+		UnlockStrategy.ANY_PARENT_UNLOCKED:
+			for parent_id in parent_nodes:
+				if _nodes[parent_id].is_unlocked():
+					return true
 			return false
-	
-	return true
+
+		UnlockStrategy.EACH_PARENT_MIN_LEVEL:
+			for parent_id in parent_nodes:
+				if not _nodes[parent_id].is_unlocked():
+					return false
+				if _nodes[parent_id].upgrade.current_level < node.required_parent_level:
+					return false
+			return true
+
+	return false
 
 # Get parent _nodes of a specified node
 func get_parent_nodes(node_id: String) -> Array:
@@ -113,7 +138,7 @@ func can_upgrade_node(node_id: String) -> bool:
 	if skill_points < xp_required:
 		return false
 		
-	return _nodes[node_id].upgrade.can_upgrade()
+	return _nodes[node_id].upgrade.can_upgrade(skill_points)
 
 # Upgrade a node if possible
 func upgrade_node(node_id: String) -> bool:

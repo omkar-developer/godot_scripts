@@ -58,27 +58,32 @@ var _inventory: Object = null # Assuming an Inventory class/script exists
 ## [param inventory]: The [Inventory] node used for material checks and consumption.[br]
 func init_upgrade(stat_owner: Object, inventory: Object) -> void:    
 	assert(is_instance_valid(stat_owner), "UpgradeTrack.init: stat_owner must be a valid object.")
-	assert(is_instance_valid(inventory), "UpgradeTrack.init: inventory must be a valid object.")
-	assert(inventory.has_method("has_materials"), "Inventory must have a has_materials method.")
-	assert(inventory.has_method("consume_materials"), "Inventory must have a consume_materials method.")
+	if _inventory != null:
+		assert(is_instance_valid(inventory), "UpgradeTrack.init: inventory must be a valid object.")
+		assert(inventory.has_method("has_materials"), "Inventory must have a has_materials method.")
+		assert(inventory.has_method("consume_materials"), "Inventory must have a consume_materials method.")
 	assert(stat_owner.has_method("get_stat"), "parent must have get_stat method")
 	_stat_owner = stat_owner
 	_inventory = inventory
 
 ## Adds experience points to the track.[br]
-## If [member auto_upgrade] is [code]true[/code], it will attempt to level up if requirements are met by calling [method _do_upgrade].[br]
+## If [member auto_upgrade] is [code]true[/code], it will attempt to level up if requirements are met by calling [method do_upgrade].[br]
 ## [param amount]: The amount of XP to add. Should be non-negative.[br]
-func add_xp(amount: int) -> void:
+func add_xp(amount: int) -> bool:
 	if amount <= 0:
 		printerr("UpgradeTrack: Cannot add negative or zero XP.")
-		return
+		return false
 	if _is_max_level(): # Don't add XP if already max level
-		return
+		return false
 
 	current_xp += amount
+	var did_upgrade: bool = false
 	if auto_upgrade:
-		while _can_upgrade():
-			_do_upgrade()
+		while can_upgrade():
+			if not do_upgrade():
+				break
+			did_upgrade = true
+	return did_upgrade
 
 ## Gets the XP required to reach the next level (complete the current level).[br]
 ## Returns 0 if the track is already at the maximum level.[br]
@@ -106,7 +111,7 @@ func get_progress_ratio() -> float:
 ## Checks if the upgrade track can currently level up based on XP and material requirements.[br]
 ## Internal use.[br]
 ## [return]: [code]true[/code] if the track can level up, [code]false[/code] otherwise.[br]
-func _can_upgrade() -> bool:
+func can_upgrade(added_xp: int=0) -> bool:
 	if _is_max_level():
 		return false
 
@@ -126,8 +131,15 @@ func _can_upgrade() -> bool:
 			return false
 
 	# Check XP
-	return current_xp >= config.xp_required
+	return current_xp + added_xp >= config.xp_required
 
+
+## Levels up the upgrade track by adding the required XP and emitting the [signal upgrade_applied] signal.[br]
+## Returns [code]true[/code] if the level up was successful, [code]false[/code] otherwise.[br]
+func level_up() -> bool:
+	if get_current_xp_required() == 0:
+		return false
+	return add_xp(get_current_xp_required())
 
 ## Sets the level of the upgrade track.[br]
 ## Removes any previous modifiers and emits the [signal upgrade_removed] signal. Internal use.[br]
@@ -165,21 +177,21 @@ func set_level(level: int=1) -> bool:
 ## Performs the upgrade process.[br]
 ## Removes previous modifiers, deducts materials and XP, applies new modifiers,
 ## increments the level, and emits relevant signals. Internal use.
-func _do_upgrade() -> bool:
+func do_upgrade() -> bool:
 	# Double check conditions before proceeding
-	if not _can_upgrade():
-		printerr("UpgradeTrack: _do_upgrade called when _can_upgrade is false.")
+	if not can_upgrade():
+		printerr("Upgrade: do_upgrade called when can_upgrade is false.")
 		return false
-	if not is_instance_valid(_stat_owner) or not is_instance_valid(_inventory):
-		printerr("UpgradeTrack: Stat owner or inventory invalid during upgrade.")
+	if not is_instance_valid(_stat_owner):
+		printerr("Upgrade: Stat owner invalid during upgrade.")
 		return false
 
 	var config: UpgradeLevelConfig = level_configs[current_level]
 
 	# Deduct materials
-	if config.required_materials:
+	if _inventory and config.required_materials:
 		if not _inventory.consume_materials(config.required_materials):
-			printerr("UpgradeTrack: Failed to consume required materials for upgrade.")
+			printerr("Upgrade: Failed to consume required materials for upgrade.")
 			return false
 
 	# Remove modifiers from the level we are leaving (if any were applied)
@@ -208,7 +220,7 @@ func _do_upgrade() -> bool:
 
 ## Removes the stat modifiers applied by the most recently completed level (if any).[br]
 ## Calls [method StatModifierSet._remove_effect] and [method StatModifierSet.uninit_modifiers].[br]
-## Does [b]not[/b] emit the [signal upgrade_removed] signal; that is handled by [method _do_upgrade].
+## Does [b]not[/b] emit the [signal upgrade_removed] signal; that is handled by [method do_upgrade].
 func remove_current_upgrade() -> void:
 	if _current_modifier:
 		var config = level_configs[current_level - 1]
@@ -289,7 +301,7 @@ func do_refund() -> int:
 	var refund_data := get_total_refund()
 	
 	# Return all consumed materials to the player's inventory
-	if not refund_data.materials.is_empty():
+	if _inventory and not refund_data.materials.is_empty():
 		if _inventory.has_method("store_materials"):
 			_inventory.store_materials(refund_data.materials)
 		else:

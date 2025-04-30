@@ -124,7 +124,7 @@ func test_manual_upgrade_with_sufficient_xp():
 	
 	# Perform the upgrade
 	watch_signals(upgrade)
-	upgrade._do_upgrade()
+	upgrade.do_upgrade()
 	
 	assert_eq(upgrade.current_level, 1, "Level should increase to 1")
 	assert_eq(upgrade.current_xp, 0, "XP should reset to 0")
@@ -148,9 +148,9 @@ func test_insufficient_materials():
 	upgrade.add_xp(100)
 	
 	# Try to upgrade
-	var can_upgrade = upgrade._can_upgrade()
+	var can_upgrade = upgrade.can_upgrade()
 	assert_false(can_upgrade, "Should not be able to upgrade without materials")
-	
+	can_upgrade
 func test_step_level_reached():
 	upgrade.auto_upgrade = true
 	watch_signals(upgrade)

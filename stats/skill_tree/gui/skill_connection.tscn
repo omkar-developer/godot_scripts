@@ -1,0 +1,15 @@
+[gd_scene load_steps=2 format=3 uid="uid://bonrbfxy0uf5f"]
+
+[ext_resource type="Script" uid="uid://c0rjihpl1yqsx" path="res://scripts/stats/skill_tree/gui/skill_connection_ui.gd" id="1_q7fid"]
+
+[node name="SkillConnection" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_q7fid")
+
+[node name="Line2D" type="Line2D" parent="."]
+points = PackedVector2Array(1, 1, 93, 124, 361, 124)
