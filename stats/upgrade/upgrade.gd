@@ -42,6 +42,20 @@ signal refund_applied(xp: int, materials: Dictionary)
 ## The current accumulated experience points towards the next level.
 @export var current_xp: int = 0
 
+@export_group("Auto Generate")
+## Curve defining how XP requirements scale between first and last upgrade
+@export var xp_curve: Curve = null
+## Curve defining how modifier value scale between first and last upgrade
+@export var modifier_curve : Curve = null	
+## Curve defining how material requirements scale between first and last upgrade
+@export var materials_curve: Curve = null
+## The first upgrade configuration to interpolate from
+@export var first_upgrade: UpgradeLevelConfig = null
+## The last upgrade configuration to interpolate to
+@export var last_upgrade: UpgradeLevelConfig = null
+## Number of levels to generate (including first and last)
+@export_range(2, 100) var level_count: int = 2
+
 ## The [StatModifierSet] currently applied by this upgrade track. Internal use.
 var _current_modifier: StatModifierSet = null
 ## The owner object whose stats will be modified. Must be set via [method init].
@@ -65,6 +79,69 @@ func init_upgrade(stat_owner: Object, inventory: Object) -> void:
 	assert(stat_owner.has_method("get_stat"), "parent must have get_stat method")
 	_stat_owner = stat_owner
 	_inventory = inventory
+
+## Generates level configurations based on the auto-generate settings
+func generate_level_configs() -> void:
+	if not first_upgrade or not last_upgrade or level_count < 2:
+		push_warning("Cannot generate levels: missing required configuration")
+		return
+		
+	if not xp_curve:
+		xp_curve = Curve.new()
+		xp_curve.add_point(Vector2(0, 0))
+		xp_curve.add_point(Vector2(1, 1))
+		
+	if not materials_curve:
+		materials_curve = Curve.new()
+		materials_curve.add_point(Vector2(0, 0))
+		materials_curve.add_point(Vector2(1, 1))
+	
+	level_configs.clear()
+	level_configs.push_back(first_upgrade)
+	
+	# Generate intermediate levels
+	for i in range(1, level_count - 1):
+		var t = float(i) / (level_count - 1)
+		var new_config = UpgradeLevelConfig.new()
+		
+		# Interpolate XP requirements
+		var xp_factor = xp_curve.sample(t)
+		new_config.xp_required = lerp(
+			first_upgrade.xp_required,
+			last_upgrade.xp_required,
+			xp_factor
+		)
+		
+		# Interpolate material requirements
+		if not first_upgrade.required_materials.is_empty() and not last_upgrade.required_materials.is_empty():
+			var materials_factor = materials_curve.sample(t)
+			new_config.required_materials = {}
+			
+			# Interpolate each material type
+			for material in first_upgrade.required_materials:
+				if material in last_upgrade.required_materials:
+					new_config.required_materials[material] = lerp(
+						first_upgrade.required_materials[material],
+						last_upgrade.required_materials[material],
+						materials_factor
+					)
+		
+		# Interpolate modifiers if both configs have them
+		if first_upgrade.modifiers and last_upgrade.modifiers:
+			var modifier_factor = modifier_curve.sample(t)
+			new_config.modifiers = first_upgrade.modifiers.interpolate_with(
+				last_upgrade.modifiers,
+				modifier_factor
+			)
+		
+		level_configs.push_back(new_config)
+	
+	level_configs.push_back(last_upgrade)
+
+## Validates and updates auto-generated configs when properties change
+func _validate_auto_generate() -> void:
+	if first_upgrade and last_upgrade and level_count >= 2:
+		generate_level_configs()
 
 ## Adds experience points to the track.[br]
 ## If [member auto_upgrade] is [code]true[/code], it will attempt to level up if requirements are met by calling [method do_upgrade].[br]

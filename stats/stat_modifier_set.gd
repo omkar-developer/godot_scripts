@@ -254,6 +254,16 @@ func copy() -> StatModifierSet:
 	mod_set.remove_on_condition_change = remove_on_condition_change
 	return mod_set
 
+## Interpolates this modifier set with another modifier set.[br]
+## [param other]: The other modifier set to interpolate with.[br]
+## [param t]: The interpolation factor.[br]
+## Returns the interpolated modifier set.
+func interpolate_with(other: StatModifierSet, t: float):
+	if other == null: return
+	for i in range(min(len(_modifiers), len(other._modifiers))):
+		if _modifiers[i].is_equal(other._modifiers[i]):
+			_modifiers[i].interpolate(other._modifiers[i], t)
+
 ## Returns a dictionary representation of this modifier set.
 func to_dict() -> Dictionary:
 	return {

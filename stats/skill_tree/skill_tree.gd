@@ -1,5 +1,5 @@
 class_name SkillTree
-extends Node
+extends Resource
 
 signal node_unlocked(node_id)
 signal node_upgraded(node_id, new_level)
@@ -256,14 +256,14 @@ func _on_node_unlocked(node_id: String) -> void:
 	_check_child_nodes_for_unlock(node_id)
 
 # Called when a node is upgraded
-func _on_node_upgraded(new_level: int, applied_config: UpgradeLevelConfig, node_id: String) -> void:
+func _on_node_upgraded(new_level: int, _applied_config: UpgradeLevelConfig, node_id: String) -> void:
 	emit_signal("node_upgraded", node_id, new_level)
 	
 	# Check if child _nodes can now be unlocked due to level requirement
 	_check_child_nodes_for_unlock(node_id)
 
 # Called when a node reaches max level
-func _on_node_max_level(node_id: String) -> void:
+func _on_node_max_level(_node_id: String) -> void:
 	# Additional logic can be added here if needed
 	pass
 

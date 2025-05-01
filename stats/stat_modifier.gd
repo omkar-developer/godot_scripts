@@ -255,6 +255,12 @@ func _to_string() -> String:
 		applied_text
 	]
 
+## Interpolates the value of this modifier using the provided other modifier and lerp t value.
+## [param other]: The other modifier to interpolate with.[br]
+## [param t]: The lerp t value.
+func interpolate(other: StatModifier, t: float) -> void:
+	set_value(lerp(_value, other._value, t))
+
 ## Returns a duplicate copy of this modifier.
 func copy() -> StatModifier:
 	return duplicate(true)

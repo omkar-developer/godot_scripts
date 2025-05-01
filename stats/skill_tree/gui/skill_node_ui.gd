@@ -5,6 +5,7 @@ signal on_upgrade(level)
 signal on_unlocked
 signal on_node_clicked(node_ui)
 
+@export var node_id: StringName
 @export var skill_node: SkillTreeNode
 @export var children_nodes: Array[SkillNodeUI] = []
 
@@ -130,7 +131,7 @@ func _invested() -> void:
 	icon.self_modulate = normal_color
 
 # Handle upgrade logic
-func try_upgrade() -> bool:
+func upgrade() -> bool:
 	if not skill_node:
 		return false
 	
@@ -237,7 +238,7 @@ func _on_gui_input(event: InputEvent) -> void:
 		_play_press_animation()
 		
 		# Try to upgrade this node
-		try_upgrade()
+		upgrade()
 
 # Play button press animation
 func _play_press_animation() -> void:
@@ -315,10 +316,6 @@ func refresh_node() -> void:
 		# Apply current hover/selection state
 		if is_hovered or is_selected:
 			_highlighted(true)
-
-# Force an upgrade attempt programmatically
-func upgrade() -> bool:
-	return try_upgrade()
 
 # Unlock the node
 func unlock() -> void:

@@ -6,15 +6,11 @@ extends Control
 var start_node: Control
 var end_node: Control
 var connection_color := Color.WHITE
-var connection_width := 2.0
+var active_color := Color(0.2, 0.8, 0.2)
 var is_active := false
 
 # Called when the node enters the scene tree
 func _ready():
-	line.width = connection_width
-	line.default_color = connection_color
-	
-	# Make sure this connection is behind the nodes
 	z_index = -1
 
 # Initialize connection between two nodes
@@ -23,17 +19,15 @@ func setup(from_node: Control, to_node: Control) -> void:
 	end_node = to_node
 	update_connection()
 
+func _set_style() -> void:
+	# Set the connection color based on whether it's active
+	connection_color = active_color if is_active else connection_color
+	line.default_color = connection_color
+
 # Update connection color based on whether it's active (parent node is unlocked)
 func set_active(active: bool) -> void:
 	is_active = active
-	line.default_color = connection_color if is_active else Color(connection_color.r, connection_color.g, connection_color.b, 0.3)
-
-# Update connection style
-func set_style(color: Color, width: float) -> void:
-	connection_color = color
-	connection_width = width
-	line.width = width
-	line.default_color = color if is_active else Color(color.r, color.g, color.b, 0.3)
+	_set_style()
 
 # Update the connection position and shape
 func update_connection() -> void:
@@ -52,8 +46,3 @@ func update_connection() -> void:
 	line.clear_points()
 	line.add_point(start_local)
 	line.add_point(end_local)
-
-# Called every frame
-func _process(_delta: float) -> void:
-	# Update connection position if the nodes have moved
-	update_connection()

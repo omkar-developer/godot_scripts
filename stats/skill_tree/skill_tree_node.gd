@@ -16,13 +16,13 @@ signal on_unlocked
 @export var required_parent_level: int = 1 
 
 # --- Runtime State ---
-@export_storage var unlocked: bool = false :
+var unlocked: bool = false :
 	set(value):
 		unlocked = value
 		if unlocked:
 			on_unlocked.emit()
 
-@export_storage var total_parents_level := 0 :
+var total_parents_level := 0 :
 	set(value):
 		total_parents_level = value
 		if total_parents_level >= required_parent_level:
