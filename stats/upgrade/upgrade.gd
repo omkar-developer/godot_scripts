@@ -1,3 +1,4 @@
+@tool
 ## Manages the progression of a single upgrade track, handling XP, levels,
 ## requirements, and applying modifiers.[br]
 ## Tracks experience points ([member current_xp]) and [member current_level] for a specific upgrade ([member upgrade_name]).[br]
@@ -54,7 +55,10 @@ signal refund_applied(xp: int, materials: Dictionary)
 ## The last upgrade configuration to interpolate to
 @export var last_upgrade: UpgradeLevelConfig = null
 ## Number of levels to generate (including first and last)
-@export_range(2, 100) var level_count: int = 2
+@export var level_count: int = 2
+
+@export_tool_button("Generate Level Configs")
+var generate =_generate_level_configs
 
 ## The [StatModifierSet] currently applied by this upgrade track. Internal use.
 var _current_modifier: StatModifierSet = null
@@ -81,7 +85,7 @@ func init_upgrade(stat_owner: Object, inventory: Object) -> void:
 	_inventory = inventory
 
 ## Generates level configurations based on the auto-generate settings
-func generate_level_configs() -> void:
+func _generate_level_configs() -> void:
 	if not first_upgrade or not last_upgrade or level_count < 2:
 		push_warning("Cannot generate levels: missing required configuration")
 		return
@@ -129,10 +133,15 @@ func generate_level_configs() -> void:
 		# Interpolate modifiers if both configs have them
 		if first_upgrade.modifiers and last_upgrade.modifiers:
 			var modifier_factor = modifier_curve.sample(t)
-			new_config.modifiers = first_upgrade.modifiers.interpolate_with(
-				last_upgrade.modifiers,
-				modifier_factor
-			)
+			var new_modifiers: StatModifierSet = first_upgrade.modifiers.duplicate()
+			for f in range(min(len(new_modifiers._modifiers), len(last_upgrade.modifiers._modifiers))):
+				var current = new_modifiers._modifiers[f]
+				var target = last_upgrade.modifiers._modifiers[f]
+
+				if current._stat_name == target._stat_name and current._type == target._type:  # or skip this if unnecessary
+					current._value = lerp(current._value, target._value, modifier_factor)
+
+			new_config.modifiers = new_modifiers
 		
 		level_configs.push_back(new_config)
 	
@@ -141,7 +150,7 @@ func generate_level_configs() -> void:
 ## Validates and updates auto-generated configs when properties change
 func _validate_auto_generate() -> void:
 	if first_upgrade and last_upgrade and level_count >= 2:
-		generate_level_configs()
+		_generate_level_configs()
 
 ## Adds experience points to the track.[br]
 ## If [member auto_upgrade] is [code]true[/code], it will attempt to level up if requirements are met by calling [method do_upgrade].[br]
@@ -215,6 +224,10 @@ func can_upgrade(added_xp: int=0) -> bool:
 ## Returns [code]true[/code] if the level up was successful, [code]false[/code] otherwise.[br]
 func level_up() -> bool:
 	if get_current_xp_required() == 0:
+		if _is_max_level(): # Don't add XP if already max level
+			return false
+		if can_upgrade():
+			do_upgrade()
 		return false
 	return add_xp(get_current_xp_required())
 

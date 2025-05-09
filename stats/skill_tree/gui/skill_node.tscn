@@ -1,4 +1,4 @@
-[gd_scene load_steps=4 format=3 uid="uid://b1wxb2mo6pspk"]
+[gd_scene load_steps=5 format=3 uid="uid://b1wxb2mo6pspk"]
 
 [ext_resource type="Script" uid="uid://b7n66d4qnlf8i" path="res://scripts/stats/skill_tree/gui/skill_node_ui.gd" id="1_nohl5"]
 [ext_resource type="Texture2D" uid="uid://c1xgwn2chet6s" path="res://icon.svg" id="2_xj6q7"]
@@ -13,6 +13,12 @@ corner_radius_top_left = 3
 corner_radius_top_right = 3
 corner_radius_bottom_right = 3
 corner_radius_bottom_left = 10
+
+[sub_resource type="LabelSettings" id="LabelSettings_nohl5"]
+font_size = 30
+font_color = Color(1, 1, 1, 0.658)
+outline_size = 2
+outline_color = Color(0.252028, 0.252028, 0.252028, 1)
 
 [node name="SkillNode" type="Control"]
 custom_minimum_size = Vector2(64, 64)
@@ -42,6 +48,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 texture = ExtResource("2_xj6q7")
 expand_mode = 1
 
@@ -59,6 +66,19 @@ grow_horizontal = 0
 theme_override_styles/normal = SubResource("StyleBoxFlat_272bh")
 text = "L19"
 horizontal_alignment = 2
+vertical_alignment = 1
+
+[node name="LockIcon" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "🔒"
+label_settings = SubResource("LabelSettings_nohl5")
+horizontal_alignment = 1
 vertical_alignment = 1
 
 [connection signal="focus_entered" from="." to="." method="_on_focus_entered"]

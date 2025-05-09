@@ -1,5 +1,6 @@
 extends Node
 class_name BuffManager
+#TODO: merge with add extra
 
 ## Signal emitted when a modifier is applied
 signal modifier_applied(modifier_name: String, modifier: StatModifierSet)

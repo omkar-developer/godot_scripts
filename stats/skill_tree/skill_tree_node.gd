@@ -48,6 +48,8 @@ func unlock() -> void:
 
 # Attempt to upgrade the node's level.
 func upgrade_level() -> bool:
+	if not is_instance_valid(upgrade):
+		return false
 	if skill_tree:
 		if skill_tree.skill_points < upgrade.get_current_xp_required():
 			return false

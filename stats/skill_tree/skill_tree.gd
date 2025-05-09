@@ -55,6 +55,42 @@ func add_connection(from_node_id: String, to_node_id: String) -> void:
 	if not _connections[from_node_id].has(to_node_id):
 		_connections[from_node_id].append(to_node_id)
 
+func get_node_requirement_text(node_id: String) -> String:
+	if not _nodes.has(node_id):
+		return ""
+		
+	var node = _nodes[node_id]
+	if node.is_unlocked():
+		return ""
+		
+	var parent_nodes = get_parent_nodes(node_id)
+	if parent_nodes.is_empty():
+		return ""
+		
+	match unlock_strategy:
+		UnlockStrategy.ALL_PARENTS_TOTAL_LEVEL:
+			var total_levels = 0
+			for parent_id in parent_nodes:
+				if _nodes[parent_id].is_unlocked():
+					total_levels += _nodes[parent_id].get_current_level()
+			return str(total_levels) + "/" + str(node.required_parent_level)
+			
+		UnlockStrategy.ANY_PARENT_UNLOCKED:
+			var highest_level = 0
+			for parent_id in parent_nodes:
+				if _nodes[parent_id].is_unlocked():
+					highest_level = max(highest_level, _nodes[parent_id].get_current_level())
+			return str(highest_level) + "/" + str(node.required_parent_level)
+			
+		UnlockStrategy.EACH_PARENT_MIN_LEVEL:
+			var levels_text = ""
+			for parent_id in parent_nodes:
+				var level = _nodes[parent_id].get_current_level()
+				levels_text += str(level) + "/" + str(node.required_parent_level) + " "
+			return levels_text.strip_edges()
+			
+	return ""
+
 func can_unlock_node(node_id: String) -> bool:
 	if not _nodes.has(node_id):
 		return false
@@ -67,28 +103,26 @@ func can_unlock_node(node_id: String) -> bool:
 	if parent_nodes.is_empty():
 		return true
 
-	var strategy = unlock_strategy
-
-	match strategy:
+	match unlock_strategy:
 		UnlockStrategy.ALL_PARENTS_TOTAL_LEVEL:
 			var total_levels = 0
 			for parent_id in parent_nodes:
 				if not _nodes[parent_id].is_unlocked():
 					return false
-				total_levels += _nodes[parent_id].upgrade.current_level
+				total_levels += _nodes[parent_id].get_current_level()
+			# Changed condition to check against the required level
 			return total_levels >= node.required_parent_level
 
 		UnlockStrategy.ANY_PARENT_UNLOCKED:
 			for parent_id in parent_nodes:
-				if _nodes[parent_id].is_unlocked():
+				# Also check if parent meets level requirement
+				if _nodes[parent_id].is_unlocked() and _nodes[parent_id].get_current_level() >= node.required_parent_level:
 					return true
 			return false
 
 		UnlockStrategy.EACH_PARENT_MIN_LEVEL:
 			for parent_id in parent_nodes:
-				if not _nodes[parent_id].is_unlocked():
-					return false
-				if _nodes[parent_id].upgrade.current_level < node.required_parent_level:
+				if not _nodes[parent_id].is_unlocked() or _nodes[parent_id].get_current_level() < node.required_parent_level:
 					return false
 			return true
 

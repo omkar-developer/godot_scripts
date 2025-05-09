@@ -15,8 +15,12 @@ signal connections_created
 # Whether to create connections in the tree from node children relationships
 @export var create_connections_from_node_children: bool = true
 
+@export var stats_owner: Node = null
+
+@export var inventory: Node = null
+
 # Reference to the actual skill tree data
-var skill_tree: SkillTree
+@export var skill_tree: SkillTree
 
 # Dictionaries to store and track UI elements
 var node_ui_elements: Dictionary = {}  # Maps node_id to SkillNodeUI
@@ -27,14 +31,17 @@ var connections: Array[SkillConnectionUI] = []  # Stores all connection objects
 @export var connection_color_active: Color = Color(0.2, 0.8, 0.2, 1.0)
 @export var connection_width: float = 2.0
 
+func _enter_tree() -> void:
+	if stats_owner == null:
+		stats_owner = get_parent()
+	if skill_tree == null:
+		skill_tree = SkillTree.new()
+	skill_tree.init_tree(inventory, stats_owner)	
+
 # Called when the node enters the scene tree for the first time
 func _ready():
-	# Find all SkillNodeUI children
 	_find_skill_node_ui_children()
-	
-	# If skill tree is already assigned, initialize it
-	if skill_tree:
-		initialize_skill_tree(skill_tree)
+	initialize_skill_tree(skill_tree)
 
 # Initialize with a SkillTree instance
 func initialize_skill_tree(tree: SkillTree) -> void:
@@ -51,13 +58,16 @@ func initialize_skill_tree(tree: SkillTree) -> void:
 	# Create connections between nodes
 	_create_connections()
 	
+	# Unlock root nodes
+	for root_node_id in skill_tree.get_root_nodes():
+		skill_tree.unlock_node(root_node_id)
+	
 	# Refresh UI state
 	refresh_all()
 
 # Find all SkillNodeUI children in the scene
 func _find_skill_node_ui_children() -> void:
 	node_ui_elements.clear()
-	
 	# Recursively find all SkillNodeUI objects
 	_find_skill_node_ui_recursive(self)
 
@@ -66,7 +76,13 @@ func _find_skill_node_ui_recursive(node: Node) -> void:
 	for child in node.get_children():
 		if child is SkillNodeUI:
 			var node_ui := child as SkillNodeUI
-			if node_ui.node_id:
+			# Auto-generate node_id if empty
+			if node_ui.node_id.is_empty():
+				node_ui.node_id = str(child.get_path()).replace("/", "_")
+			
+			if node_ui.skill_node != null and not skill_tree._nodes.has(node_ui.node_id):
+				skill_tree.add_node(node_ui.node_id, node_ui.skill_node)
+			
 				node_ui_elements[node_ui.node_id] = node_ui
 				# Connect the node UI signals
 				node_ui.on_node_clicked.connect(_on_node_ui_clicked)
@@ -81,15 +97,8 @@ func _find_skill_node_ui_recursive(node: Node) -> void:
 func _initialize_node_uis() -> void:
 	for node_id in node_ui_elements:
 		var node_ui = node_ui_elements[node_id]
-		
-		# Make sure the node exists in the skill tree
-		if skill_tree._nodes.has(node_id):
-			var skill_node = skill_tree._nodes[node_id]
-			node_ui.skill_node = skill_node
-			node_ui.init_upgrade(skill_node.upgrade.stat_owner, skill_node.upgrade.inventory, skill_tree)
-			node_ui.refresh_node()
-		else:
-			printerr("SkillTreeUI: Node ID '", node_id, "' not found in skill tree!")
+		node_ui.init_upgrade(stats_owner, inventory, skill_tree)
+		node_ui.refresh_node()
 
 # Create connections between nodes based on the skill tree
 func _create_connections() -> void:
@@ -134,7 +143,6 @@ func _find_connections_recursive(node: Node, existing_connections: Dictionary) -
 					# Update connection style
 					if skill_tree and skill_tree._nodes.has(from_node_ui.node_id):
 						var is_active = skill_tree._nodes[from_node_ui.node_id].is_unlocked()
-						connection.set_style(connection_color_active if is_active else connection_color_normal, connection_width)
 						connection.set_active(is_active)
 					
 					connections.append(connection)
@@ -171,8 +179,7 @@ func _create_connections_from_skill_tree(existing_connections: Dictionary) -> vo
 			connection.setup(from_node_ui, to_node_ui)
 			
 			# Set connection style based on whether parent node is unlocked
-			var is_active = skill_tree._nodes[from_node_id].is_unlocked()
-			connection.set_style(connection_color_active if is_active else connection_color_normal, connection_width)
+			var is_active = skill_tree._nodes[from_node_id].is_unlocked()			
 			connection.set_active(is_active)
 			
 			# Add to tracking
@@ -215,8 +222,7 @@ func _create_connections_from_node_ui_children(existing_connections: Dictionary)
 					# Set connection style
 					var is_active = false
 					if skill_tree and skill_tree._nodes.has(from_node_id):
-						is_active = skill_tree._nodes[from_node_id].is_unlocked()
-					connection.set_style(connection_color_active if is_active else connection_color_normal, connection_width)
+						is_active = skill_tree._nodes[from_node_id].is_unlocked()					
 					connection.set_active(is_active)
 					
 					# Add to tracking
@@ -239,12 +245,16 @@ func refresh_all() -> void:
 	_update_connection_states()
 
 # Update connection visuals based on node states
-func _update_connection_states() -> void:
+func _update_connection_states(node_id := "") -> void:
 	for connection in connections:
 		if connection.start_node is SkillNodeUI and connection.end_node is SkillNodeUI:
+			if node_id != "" and node_id != connection.start_node.node_id:
+				continue
 			var start_node_ui = connection.start_node as SkillNodeUI
-			var is_active = start_node_ui.skill_node.is_unlocked()
+			var end_node_ui = connection.end_node as SkillNodeUI
+			var is_active = start_node_ui.skill_node.is_unlocked() and end_node_ui.skill_node.is_unlocked()
 			connection.set_active(is_active)
+			connection.update_requirement_text(skill_tree)
 
 # SIGNAL HANDLERS
 
@@ -253,12 +263,12 @@ func _on_node_ui_clicked(node_ui: SkillNodeUI) -> void:
 	emit_signal("node_clicked", node_ui)
 
 # Node UI was unlocked
-func _on_node_ui_unlocked(node_ui: SkillNodeUI) -> void:
+func _on_node_ui_unlocked(_node_ui: SkillNodeUI) -> void:
 	# Update connections
 	_update_connection_states()
 
 # Node UI was upgraded
-func _on_node_ui_upgraded(node_ui: SkillNodeUI, level: int) -> void:
+func _on_node_ui_upgraded(_node_ui: SkillNodeUI, _level: int) -> void:
 	# Check if any connections need updating
 	_update_connection_states()
 
@@ -276,11 +286,11 @@ func _on_skill_tree_node_unlocked(node_id: String) -> void:
 func _on_skill_tree_node_upgraded(node_id: String, new_level: int) -> void:
 	if node_ui_elements.has(node_id):
 		node_ui_elements[node_id].refresh_node()
-	
+	_update_connection_states(node_id)	
 	emit_signal("node_upgraded", node_id, new_level)
 
 # Skill points changed
-func _on_skill_points_changed(new_amount: int) -> void:
+func _on_skill_points_changed(_new_amount: int) -> void:
 	# Refresh all nodes to update their appearance based on whether they can be upgraded
 	refresh_all()
 

@@ -2,7 +2,7 @@ class_name SkillNodeUI
 extends Control
 
 signal on_upgrade(level)
-signal on_unlocked
+signal on_unlocked(node_ui)
 signal on_node_clicked(node_ui)
 
 @export var node_id: StringName
@@ -58,7 +58,8 @@ func _ready() -> void:
 	# Set initial state
 	if skill_node:
 		# Connect signals from the skill node
-		skill_node.on_unlocked.connect(_on_node_unlocked)
+		if not skill_node.on_unlocked.is_connected(_on_node_unlocked):
+			skill_node.on_unlocked.connect(_on_node_unlocked)
 		
 		# Initialize visual state based on node's current state
 		refresh_node_state()
@@ -67,10 +68,13 @@ func _ready() -> void:
 		current_level = skill_node.get_current_level()
 		_update_level_label()
 	else:
+		refresh_node_state()
 		printerr("SkillNodeUI: No skill_node assigned!")
 
 # Determine the current state of the node
 func get_node_state() -> int:
+	if not is_instance_valid(skill_node):
+		return NodeState.LOCKED
 	if not skill_node.is_unlocked():
 		return NodeState.LOCKED
 	elif skill_node.get_current_level() == 0:
@@ -99,7 +103,7 @@ func _on_node_unlocked() -> void:
 	_play_unlock_animation()
 	
 	# Emit signal
-	on_unlocked.emit()
+	on_unlocked.emit(self)
 
 # Play unlock animation
 func _play_unlock_animation() -> void:
@@ -222,6 +226,10 @@ func set_selected(selected: bool = true) -> void:
 
 # Input Handling
 func _on_mouse_entered() -> void:
+	if not skill_node:
+		return
+	if not skill_node.is_unlocked():
+		return
 	is_hovered = true
 	_highlighted(true)
 
@@ -230,6 +238,10 @@ func _on_mouse_exited() -> void:
 	_highlighted(false)
 
 func _on_gui_input(event: InputEvent) -> void:
+	if not skill_node:
+		return
+	if not skill_node.is_unlocked():
+		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		# Emit signal so parent can handle selection
 		on_node_clicked.emit(self)
@@ -277,9 +289,6 @@ func init_upgrade(stat_owner: Object, inventory: Object = null, tree: SkillTree 
 
 # Refresh node state based on the current skill node state
 func refresh_node_state() -> void:
-	if not skill_node:
-		return
-		
 	# Determine the current state
 	node_state = get_node_state()
 	
