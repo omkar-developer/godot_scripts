@@ -3,7 +3,7 @@ extends Control
 
 @onready var line := %Line2D
 @export var show_requirements: bool = true
-@export var line_width: float = 2
+@export var line_width: float = 3
 @onready var requirement_label:= %Requirements
 @export var label_offset: Vector2 = Vector2(-32, -16)
 @export var connection_color := Color.WHITE

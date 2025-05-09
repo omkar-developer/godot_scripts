@@ -15,6 +15,8 @@ signal connections_created
 # Whether to create connections in the tree from node children relationships
 @export var create_connections_from_node_children: bool = true
 
+@export var auto_unlock_root_nodes: bool = true
+
 @export var stats_owner: Node = null
 
 @export var inventory: Node = null
@@ -59,8 +61,9 @@ func initialize_skill_tree(tree: SkillTree) -> void:
 	_create_connections()
 	
 	# Unlock root nodes
-	for root_node_id in skill_tree.get_root_nodes():
-		skill_tree.unlock_node(root_node_id)
+	if auto_unlock_root_nodes:
+		for root_node_id in skill_tree.get_root_nodes():
+			skill_tree.unlock_node(root_node_id)
 	
 	# Refresh UI state
 	refresh_all()

@@ -227,7 +227,7 @@ func level_up() -> bool:
 		if _is_max_level(): # Don't add XP if already max level
 			return false
 		if can_upgrade():
-			do_upgrade()
+			return do_upgrade()
 		return false
 	return add_xp(get_current_xp_required())
 

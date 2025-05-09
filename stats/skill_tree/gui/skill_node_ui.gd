@@ -8,9 +8,10 @@ signal on_node_clicked(node_ui)
 @export var node_id: StringName
 @export var skill_node: SkillTreeNode
 @export var children_nodes: Array[SkillNodeUI] = []
+@export var upgrade_on_press := true
 
 # Style customization
-@export_category("Visual Settings")
+@export_group("Visual Settings")
 @export var locked_color: Color = Color(0.39, 0.39, 0.39, 1.0)      # Node is locked
 @export var unlocked_color: Color = Color(0.7, 0.7, 0.7, 1.0)       # Node is unlocked but level 0
 @export var invested_color: Color = Color.WHITE                     # Node has points invested (level 1+)
@@ -23,7 +24,7 @@ signal on_node_clicked(node_ui)
 @export var hide_level_when_locked: bool = true                     # Hide level label when locked
 
 # Animation settings
-@export_category("Animation Settings")
+@export_group("Animation Settings")
 @export var press_animation_duration: float = 0.15
 @export var hover_animation_duration: float = 0.2
 @export var level_up_animation_duration: float = 0.5
@@ -237,14 +238,15 @@ func _on_mouse_exited() -> void:
 	is_hovered = false
 	_highlighted(false)
 
-func _on_gui_input(event: InputEvent) -> void:
-	if not skill_node:
-		return
-	if not skill_node.is_unlocked():
-		return
+func _on_gui_input(event: InputEvent) -> void:	
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		# Emit signal so parent can handle selection
 		on_node_clicked.emit(self)
+
+		if not skill_node or not upgrade_on_press:
+			return
+		if not skill_node.is_unlocked():
+			return
 		
 		# Play press animation
 		_play_press_animation()
