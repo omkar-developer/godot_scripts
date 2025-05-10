@@ -285,7 +285,3 @@ func from_dict(dict: Dictionary) -> void:
 	_is_applied = dict.get("is_applied", _is_applied)
 	_apply_only_once = dict.get("apply_only_once", _apply_only_once)
 	_applied_value = dict.get("applied_value", _applied_value)
-
-## Returns the class name of this modifier.
-func get_class_name() -> String:
-	return "StatModifier"

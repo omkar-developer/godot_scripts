@@ -225,7 +225,3 @@ func from_dict(data: Dictionary, parent: Object = null) -> void:
 	tick_timer = data.get("tick_timer", 0.0)
 	ticks = data.get("ticks", 0)
 	running = data.get("running", false)
-
-## Returns the class name of this modifier
-func get_class_name() -> String:
-	return "StatModifierSetTimed"

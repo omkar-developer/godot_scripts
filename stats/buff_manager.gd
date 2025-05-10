@@ -137,34 +137,6 @@ func _process(delta: float) -> void:
 	for modifier_name in to_remove:
 		remove_modifier(modifier_name)
 
-# Add these at the top of the file with other class variables
-## Dictionary mapping class names to modifier set types
-static var modifier_set_types: Dictionary = {
-	"StatModifierSet": StatModifierSet,
-	"StatModifierSetTimed": StatModifierSetTimed
-}
-
-## Dictionary mapping class names to module types
-static var module_types: Dictionary = {
-	"BMModule": BMModule,
-	"BMMCategory": BMMCategory,
-	"BMMResistance": BMMResistance,
-	"BMM_Stacking": BMM_Stacking,
-	# Add any other module types you have here
-}
-
-static func register_modifier_set_type(_name: String, type) -> void:
-	modifier_set_types[_name] = type
-
-static func register_module_type(_name: String, type) -> void:
-	module_types[_name] = type
-
-static func unregister_modifier_set_type(_name: String) -> void:
-	modifier_set_types.erase(_name)
-
-static func unregister_module_type(_name: String) -> void:
-	module_types.erase(_name)
-
 ## Returns a dictionary representation of the buff manager's state
 func to_dict(modules: bool = false) -> Dictionary:
 	return {
@@ -173,14 +145,14 @@ func to_dict(modules: bool = false) -> Dictionary:
 		var modifier = _active_modifiers[key]
 		return {
 			"key": key,
-			"class_name": modifier.get_class_name(),
+			"class_type": modifier.get_script().get_global_name(),
 			"data": modifier.to_dict()
 		}
 		),
 		"modules": _modules.map(
 		func(module): 
 		return {
-			"class_name": module.get_class_name(),
+			"class_type": module.get_script().get_global_name(),
 			"data": module.to_dict()
 		} if modules else {}
 		)
@@ -196,34 +168,36 @@ func from_dict(data: Dictionary, modules: bool = false) -> void:
 	
 	# Load modifiers
 	for mod_data in data.get("active_modifiers", []):
-		var modifier = _instantiate_modifier_set(mod_data.get("class_name", ""))
+		var modifier = _instantiate_class(mod_data.get("class_type", ""))
 		modifier.from_dict(mod_data["data"])
 		apply_modifier(modifier, false)  # false to not copy since we just created it
 	
 	# Load modules
 	if not modules or data.get("modules", []).is_empty(): return
 	for module_data in data.get("modules", []):
-		var module = _instantiate_module(module_data.get("class_name", ""))
+		var module = _instantiate_class(module_data.get("class_type", ""))
 		if module:
 			module.from_dict(module_data["data"])
 			add_module(module)
 
-## Instantiates a modifier set of the given type
-func _instantiate_modifier_set(modifier_type: String) -> StatModifierSet:
-	if modifier_type in modifier_set_types:
-		return modifier_set_types[modifier_type].new()
-	else:
-		push_warning("Unknown modifier set type: %s, defaulting to StatModifierSet." % modifier_type)
+func _instantiate_class(class_type: String) -> Object:
+	var global_classes = ProjectSettings.get_global_class_list()
+	
+	# Find the class in the global class list
+	for gc in global_classes:
+		if gc["class"] == class_type:
+			# Load the script and instantiate it
+			var script = load(gc["path"])
+			if script:
+				return script.new()
+	
+	# Fallback for built-in classes or if not found in global class list
+	if class_type == "StatModifier":
+		return StatModifier.new()
+	elif class_type == "Condition":
+		return Condition.new()
+	elif class_type == "StatModifierSet":
 		return StatModifierSet.new()
-
-## Instantiates a module of the given type
-func _instantiate_module(module_type: String) -> BMModule:
-	if module_type in module_types:
-		return module_types[module_type].new()
 	else:
-		push_warning("Unknown module type: %s, skipping." % module_type)
+		push_warning("Unknown class type: %s, defaulting to null." % class_type)
 		return null
-
-## Returns the class name of the buff manager
-func get_class_name() -> String:
-	return "BuffManager"

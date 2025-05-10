@@ -46,28 +46,6 @@ var _marked_for_deletion := false
 ## The _parent object associated with this modifier set.
 var _parent: Object
 
-
-static var modifier_types = {
-	"StatModifierComposite": StatModifierComposite,
-	"StatModifier": StatModifier,
-}
-
-static var condition_types = {
-	"Condition": Condition,
-}
-
-static func register_modifier_type(name: String, type) -> void:
-	modifier_types[name] = type
-
-static func register_condition_type(name: String, type) -> void:
-	condition_types[name] = type
-
-static func unregister_modifier_type(name: String) -> void:
-	modifier_types.erase(name)
-
-static func unregister_condition_type(name: String) -> void:
-	condition_types.erase(name)
-
 ## Return the modifer name
 func get_modifier_name() -> String:
 	return _modifier_name
@@ -290,12 +268,12 @@ func interpolate_with(other: StatModifierSet, t: float):
 func to_dict() -> Dictionary:
 	return {
 		"modifiers": _modifiers.map(func(m: StatModifier):
-			return {"class_name": m.get_class_name(),"data": m.to_dict()}),
+			return {"class_name": m.get_script().get_global_name(),"data": m.to_dict()}),
 		"modifier_name": _modifier_name,
 		"group": _group,
 		"process": process,
 		"condition": condition.to_dict() if condition else {},
-		"condition_class": condition.get_class_name() if condition else "",
+		"condition_class": condition.get_script().get_global_name() if condition else "",
 		"marked_for_deletion": _marked_for_deletion,
 		"remove_all": _remove_all,
 		"merge_enabled": merge_enabled,
@@ -316,7 +294,7 @@ func from_dict(data: Dictionary, parent: Object = null) -> void:
 	
 	_modifiers.assign(data.get("modifiers", []).map(
 		func(m_data: Dictionary): 
-			var m = _instantiate_modifier(m_data.get("class_name", ""))
+			var m = _instantiate_class(m_data.get("class_name", ""))
 			m.from_dict(m_data["data"])
 			m.init_stat(_parent)
 			return m
@@ -326,8 +304,8 @@ func from_dict(data: Dictionary, parent: Object = null) -> void:
 	_group = data.get("group", "")
 	process = data.get("process", false)
 
-	if data.has("condition_class"):
-		condition = _instantiate_condition(data["condition_class"])
+	if data.has("condition_class") and data["condition_class"] != "":
+		condition = _instantiate_class(data["condition_class"])
 		condition.from_dict(data["condition"])
 		condition.init_stat(_parent)
 		_connect_condition()
@@ -340,20 +318,22 @@ func from_dict(data: Dictionary, parent: Object = null) -> void:
 	apply_on_condition_change = data.get("apply_on_condition_change", false)
 	remove_on_condition_change = data.get("remove_on_condition_change", false)
 
-func _instantiate_modifier(modifier_type: String) -> StatModifier:
-	if modifier_type in modifier_types:
-		return modifier_types[modifier_type].new()
-	else:
-		push_warning("Unknown modifier type: %s, defaulting to StatModifier." % modifier_type)
+func _instantiate_class(class_type: String) -> Object:
+	var global_classes = ProjectSettings.get_global_class_list()
+	
+	# Find the class in the global class list
+	for gc in global_classes:
+		if gc["class"] == class_type:
+			# Load the script and instantiate it
+			var script = load(gc["path"])
+			if script:
+				return script.new()
+	
+	# Fallback for built-in classes or if not found in global class list
+	if class_type == "StatModifier":
 		return StatModifier.new()
-
-func _instantiate_condition(condition_type: String) -> Condition:
-	if condition_type in condition_types:
-		return condition_types[condition_type].new()
-	else:
-		push_warning("Unknown condition type: %s, defaulting to Condition." % condition_type)
+	elif class_type == "Condition":
 		return Condition.new()
-
-## Returns the class name of this modifier set.
-func get_class_name() -> String:
-	return "StatModifierSet"
+	else:
+		push_warning("Unknown class type: %s, defaulting to null." % class_type)
+		return null

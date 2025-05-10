@@ -229,7 +229,3 @@ func _to_string() -> String:
 	ref_info += ", Dynamic: %s)" % (!_snapshot_stats)
 	
 	return base_info + ref_info
-
-## Returns the class name of this modifier
-func get_class_name() -> String:
-	return "StatModifierComposite"
