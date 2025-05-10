@@ -54,7 +54,6 @@ func upgrade_level() -> bool:
 		if skill_tree.skill_points < upgrade.get_current_xp_required():
 			return false
 	if upgrade.level_up():
-		if skill_tree: skill_tree.skill_points -= upgrade.get_current_xp_required()
 		return true
 	return false
 
