@@ -1,3 +1,4 @@
+@tool
 extends Resource
 
 ## A class that represents a set of stat _modifiers and provides methods to manage and apply them.
@@ -21,25 +22,30 @@ signal on_effect_remove # Signal emitted when an effect is removed from a stat.
 ## Whether to process this modifier set every frame.
 @export var process := false
 
-## The condition associated with this modifier set.
-@export var condition: Condition
-
-@export var apply_on_condition_change := true
-@export var remove_on_condition_change := true
-
-@export_storage var _marked_for_deletion := false
-
-## The _parent object associated with this modifier set.
-var _parent: Object
-
 ## apply as soon as initialized or added to the list
 @export var _apply := true
 ## remove effect when uninit
 @export var _remove_all := true
+## remove as soon as applied (effect will not be removed)
+@export var consumable := false
+
+@export_group("Condition")
+## The condition associated with this modifier set.
+@export var condition: Condition
+## Whether to apply effects when the condition changes.
+@export var apply_on_condition_change := true
+## Whether to remove effects when the condition changes.
+@export var remove_on_condition_change := true
 ## apply effect when condition is true when initializing 
 @export var _condition_apply_on_start := true
 ## pause process when condition is false and vice versa
 @export var _condition_pause_process := false
+
+var _marked_for_deletion := false
+
+## The _parent object associated with this modifier set.
+var _parent: Object
+
 
 static var modifier_types = {
 	"StatModifierComposite": StatModifierComposite,
@@ -49,6 +55,18 @@ static var modifier_types = {
 static var condition_types = {
 	"Condition": Condition,
 }
+
+static func register_modifier_type(name: String, type) -> void:
+	modifier_types[name] = type
+
+static func register_condition_type(name: String, type) -> void:
+	condition_types[name] = type
+
+static func unregister_modifier_type(name: String) -> void:
+	modifier_types.erase(name)
+
+static func unregister_condition_type(name: String) -> void:
+	condition_types.erase(name)
 
 ## Return the modifer name
 func get_modifier_name() -> String:
@@ -162,9 +180,13 @@ func init_modifiers(parent: Object) -> void:
 		if _condition_apply_on_start:
 			_apply_effect()
 			if _condition_pause_process: process = condition.get_condition()
+
 	# Apply effects
-	if _apply and condition == null:
+	if (_apply or consumable) and condition == null:
 		_apply_effect()
+	
+	if consumable:
+		delete()
 
 ## Uninitializes all _modifiers in this set.
 func uninit_modifiers() -> void:
@@ -284,8 +306,11 @@ func to_dict() -> Dictionary:
 	}
 
 ## Loads this modifier set from a dictionary.
-func from_dict(data: Dictionary) -> void:
+func from_dict(data: Dictionary, parent: Object = null) -> void:
 	if data == null: return
+
+	if parent != null and parent.has_method("get_stat"):		
+		_parent = parent
 	
 	clear_all()
 	

@@ -1,3 +1,4 @@
+@tool
 extends StatModifier
 
 ## StatModifierComposite allows stats to be modified based on other reference stats.

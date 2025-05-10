@@ -153,6 +153,18 @@ static var module_types: Dictionary = {
 	# Add any other module types you have here
 }
 
+static func register_modifier_set_type(_name: String, type) -> void:
+	modifier_set_types[_name] = type
+
+static func register_module_type(_name: String, type) -> void:
+	module_types[_name] = type
+
+static func unregister_modifier_set_type(_name: String) -> void:
+	modifier_set_types.erase(_name)
+
+static func unregister_module_type(_name: String) -> void:
+	module_types.erase(_name)
+
 ## Returns a dictionary representation of the buff manager's state
 func to_dict(modules: bool = false) -> Dictionary:
 	return {

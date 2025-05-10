@@ -150,7 +150,7 @@ func test_insufficient_materials():
 	# Try to upgrade
 	var can_upgrade = upgrade.can_upgrade()
 	assert_false(can_upgrade, "Should not be able to upgrade without materials")
-	can_upgrade
+
 func test_step_level_reached():
 	upgrade.auto_upgrade = true
 	watch_signals(upgrade)
@@ -303,3 +303,319 @@ func test_refund():
 	assert_eq(upgrade.current_xp, 0, "XP should be refunded for full level")
 	assert_signal_emitted(upgrade, "refund_applied", {"amount": total_refund.xp})
 	assert_true(mock_inventory.returned, "All materials should have been returned")
+
+func test_enable_infinite_levels():
+	upgrade.enable_infinite_levels = true
+	assert_true(upgrade.enable_infinite_levels, "Infinite levels should be enabled")
+	
+	# Check that we don't consider max level when infinite is enabled
+	upgrade.current_level = upgrade.level_configs.size()
+	assert_false(upgrade._is_max_level(), "With infinite levels, there should be no max level")
+	
+	upgrade.enable_infinite_levels = false
+	assert_true(upgrade._is_max_level(), "With infinite levels disabled, we should be at max level")
+
+func test_extrapolate_linear_growth():
+	# Setup linear growth pattern
+	upgrade.enable_infinite_levels = true
+	upgrade.infinite_xp_pattern = Upgrade.GrowthPattern.LINEAR
+	upgrade.infinite_material_pattern = Upgrade.GrowthPattern.LINEAR
+	upgrade.infinite_modifier_pattern = Upgrade.GrowthPattern.LINEAR
+	upgrade.infinite_xp_multiplier = 100
+	upgrade.infinite_material_multiplier = 10
+	upgrade.infinite_modifier_multiplier = 5
+	
+	# Set level to max of defined configs
+	upgrade.set_level(upgrade.level_configs.size() + 1)
+	
+	# Get the extrapolated config for next level
+	var extrapolated_config = upgrade._generate_extrapolated_config(upgrade.level_configs.size() + 1)
+	
+	# Test XP calculation
+	var last_defined_xp = upgrade.level_configs[-1].xp_required
+	var expected_xp = last_defined_xp + upgrade.infinite_xp_multiplier * 1
+	assert_eq(extrapolated_config.xp_required, int(expected_xp), 
+		"Linear XP should be base + multiplier * (level_diff)")
+	
+	# Test material calculation
+	var last_iron = upgrade.level_configs[-1].required_materials["iron"]
+	var expected_iron = last_iron + upgrade.infinite_material_multiplier * 1
+	assert_eq(extrapolated_config.required_materials["iron"], int(expected_iron), 
+		"Linear material amount should be base + multiplier * (level_diff)")
+	
+	# Test modifier calculation
+	var strength_mod = extrapolated_config.modifiers._modifiers[0]
+	var last_strength = upgrade.level_configs[-1].modifiers._modifiers[0]._value
+	var expected_strength = last_strength + upgrade.infinite_modifier_multiplier * 1
+	assert_eq(strength_mod._value, expected_strength, 
+		"Linear modifier value should be base + multiplier * (level_diff)")
+
+func test_extrapolate_exponential_growth():
+	# Setup exponential growth pattern
+	upgrade.enable_infinite_levels = true
+	upgrade.infinite_xp_pattern = Upgrade.GrowthPattern.EXPONENTIAL
+	upgrade.infinite_material_pattern = Upgrade.GrowthPattern.EXPONENTIAL
+	upgrade.infinite_modifier_pattern = Upgrade.GrowthPattern.EXPONENTIAL
+	upgrade.infinite_xp_multiplier = 1.5
+	upgrade.infinite_material_multiplier = 1.2
+	upgrade.infinite_modifier_multiplier = 1.1
+	
+	# Set level to max of defined configs
+	upgrade.set_level(upgrade.level_configs.size())
+	
+	# Get configs for next two levels to check progression
+	var next_level = upgrade.level_configs.size() + 1
+	var extrapolated_config1 = upgrade._generate_extrapolated_config(next_level)
+	var extrapolated_config2 = upgrade._generate_extrapolated_config(next_level + 1)
+	
+	# Test XP calculation
+	var last_defined_xp = upgrade.level_configs[-1].xp_required
+	var expected_xp1 = last_defined_xp * pow(upgrade.infinite_xp_multiplier, 1)
+	var expected_xp2 = last_defined_xp * pow(upgrade.infinite_xp_multiplier, 2)
+	
+	assert_eq(extrapolated_config1.xp_required, int(expected_xp1), 
+		"Exponential XP should be base * pow(multiplier, level_diff)")
+	assert_eq(extrapolated_config2.xp_required, int(expected_xp2), 
+		"Exponential XP should continue growing")
+	
+	# Check that XP is exponentially increasing
+	assert_gt(extrapolated_config2.xp_required - extrapolated_config1.xp_required,
+		extrapolated_config1.xp_required - last_defined_xp,
+		"Exponential growth should have increasing differences")
+
+func test_extrapolate_polynomial_growth():
+	# Setup polynomial growth pattern
+	upgrade.enable_infinite_levels = true
+	upgrade.infinite_xp_pattern = Upgrade.GrowthPattern.POLYNOMIAL
+	upgrade.infinite_xp_exponent = 2.0
+	
+	# Set level to max of defined configs
+	var last_level = upgrade.level_configs.size()
+	upgrade.set_level(last_level)
+	
+	# Get the extrapolated config
+	var next_level = last_level + 1
+	var extrapolated_config = upgrade._generate_extrapolated_config(next_level)
+	
+	# Test XP calculation
+	var last_defined_xp = upgrade.level_configs[-1].xp_required
+	var expected_xp = last_defined_xp * pow(float(next_level) / last_level, upgrade.infinite_xp_exponent)
+	
+	assert_eq(extrapolated_config.xp_required, int(expected_xp), 
+		"Polynomial XP should be base * pow(level_ratio, exponent)")
+
+func test_extrapolate_logarithmic_growth():
+	# Setup logarithmic growth pattern
+	upgrade.enable_infinite_levels = true
+	upgrade.infinite_xp_pattern = Upgrade.GrowthPattern.LOGARITHMIC
+	upgrade.infinite_xp_multiplier = 2.0
+	
+	# Set level to max of defined configs
+	var last_level = upgrade.level_configs.size()
+	upgrade.set_level(last_level)
+	
+	# Get configs for levels further out to check slowing growth
+	var next_level = last_level + 1
+	var far_level = last_level + 10
+	var extrapolated_config1 = upgrade._generate_extrapolated_config(next_level)
+	var extrapolated_config2 = upgrade._generate_extrapolated_config(next_level + 1)
+	var extrapolated_config_far = upgrade._generate_extrapolated_config(far_level)
+	
+	# Test XP calculation
+	var last_defined_xp = upgrade.level_configs[-1].xp_required
+	var expected_xp = last_defined_xp * (1.0 + log(float(next_level) / last_level) * upgrade.infinite_xp_multiplier)
+	
+	assert_eq(extrapolated_config1.xp_required, int(expected_xp), 
+		"Logarithmic XP should be base * (1 + log(level_ratio) * multiplier)")
+	
+	# Check that growth is slowing down
+	var diff1 = extrapolated_config2.xp_required - extrapolated_config1.xp_required
+	var diff_far = (extrapolated_config_far.xp_required - extrapolated_config1.xp_required) / 9.0  # Average growth per level
+	
+	assert_gt(diff1, diff_far, "Logarithmic growth should slow down over time")
+
+func test_extrapolate_custom_formula():
+	# Setup custom formula growth
+	upgrade.enable_infinite_levels = true
+	upgrade.infinite_xp_pattern = Upgrade.GrowthPattern.CUSTOM
+	upgrade.infinite_xp_formula = "base + (level * level) - (last_level * last_level)"
+	
+	# Set level to max of defined configs
+	var last_level = upgrade.level_configs.size()
+	upgrade.set_level(last_level)
+	
+	# Get the extrapolated config
+	var next_level = last_level + 1
+	var extrapolated_config = upgrade._generate_extrapolated_config(next_level)
+	
+	# Test XP calculation
+	var last_defined_xp = upgrade.level_configs[-1].xp_required
+	var expected_xp = last_defined_xp + (next_level * next_level) - (last_level * last_level)
+	
+	assert_eq(extrapolated_config.xp_required, int(expected_xp), 
+		"Custom formula XP should be calculated correctly")
+
+func test_custom_formula_with_error():
+	# Setup invalid custom formula
+	upgrade.enable_infinite_levels = true
+	upgrade.infinite_xp_pattern = Upgrade.GrowthPattern.CUSTOM
+	upgrade.infinite_xp_formula = "this is not a valid formula!"
+	
+	# Set level to max of defined configs
+	var last_level = upgrade.level_configs.size()
+	upgrade.set_level(last_level)
+	
+	# Get the extrapolated config
+	var next_level = last_level + 1
+	var extrapolated_config = upgrade._generate_extrapolated_config(next_level)
+	
+	# Test that we fall back to exponential growth
+	var last_defined_xp = upgrade.level_configs[-1].xp_required
+	var fallback_xp = last_defined_xp * pow(1.15, next_level - last_level)
+	
+	assert_eq(extrapolated_config.xp_required, int(fallback_xp), 
+		"Invalid custom formula should fall back to exponential growth")
+
+func test_upgrade_past_defined_levels():
+	# Setup
+	upgrade.enable_infinite_levels = true
+	upgrade.infinite_xp_pattern = Upgrade.GrowthPattern.EXPONENTIAL
+	upgrade.infinite_xp_multiplier = 1.5
+	
+	## Set to just below last level
+	var last_level = upgrade.level_configs.size()
+	upgrade.set_level(last_level - 1)
+	
+	## Add enough XP to level up twice
+	var xp_for_last_defined = upgrade.level_configs[last_level - 1].xp_required
+	var extrapolated_next = upgrade._generate_extrapolated_config(last_level + 1)
+	var total_needed = xp_for_last_defined + extrapolated_next.xp_required
+	
+	## Simulate auto-upgrade
+	upgrade.auto_upgrade = true
+	
+	## Add slightly more than needed for two levels
+	upgrade.add_xp(total_needed + 10)
+	
+	## We should now be at level+1 (first infinite level)
+	assert_eq(upgrade.current_level, last_level + 1, 
+		"Should level up past defined levels with infinite enabled")
+	
+	## XP should be the remainder
+	assert_eq(upgrade.current_xp, 10, "Remaining XP should be correct")
+
+func test_infinite_leveling_disabled():
+	## Setup - infinite disabled
+	upgrade.enable_infinite_levels = false
+	
+	## Set to last level
+	var last_level = upgrade.level_configs.size()
+	upgrade.set_level(last_level)
+	
+	## Add some XP
+	upgrade.add_xp(1000, true)
+	
+	## Level shouldn't change
+	assert_eq(upgrade.current_level, last_level, 
+		"Should not level up past max when infinite levels disabled")
+	
+	## XP should still be added
+	assert_eq(upgrade.current_xp, 1000, "XP should still accumulate")
+
+func test_can_upgrade_with_infinite():
+	## Setup
+	upgrade.enable_infinite_levels = true
+	upgrade.auto_upgrade = false  ## Manual upgrades for testing
+	
+	## Set to last level 
+	var last_level = upgrade.level_configs.size()
+	upgrade.set_level(last_level)
+	
+	## First we shouldn't be able to upgrade (not enough XP)
+	assert_false(upgrade.can_upgrade(), "Should not be able to upgrade without XP")
+	
+	## Add exactly enough XP
+	var extrapolated = upgrade._generate_extrapolated_config(last_level + 1)
+	upgrade.current_xp = extrapolated.xp_required
+	
+	## Now we should be able to upgrade
+	assert_true(upgrade.can_upgrade(), "Should be able to upgrade with enough XP")
+	
+	## Do the upgrade
+	assert_true(upgrade.do_upgrade(), "Upgrade should succeed")
+	assert_eq(upgrade.current_level, last_level + 1, "Level should increment")
+	assert_eq(upgrade.current_xp, 0, "XP should be reset")
+
+func test_get_current_xp_required_with_infinite():
+	## Setup
+	upgrade.enable_infinite_levels = true
+	
+	## Set to last level
+	var last_level = upgrade.level_configs.size()
+	upgrade.set_level(last_level)
+	
+	## Get required XP for next level
+	var extrapolated = upgrade._generate_extrapolated_config(last_level + 1)
+	var expected_required = extrapolated.xp_required
+	
+	## Check if get_current_xp_required matches
+	assert_eq(upgrade.get_current_xp_required(), expected_required, 
+		"get_current_xp_required should return extrapolated XP amount")
+	
+	## Add some XP
+	var partial_xp = expected_required / 2
+	upgrade.current_xp = partial_xp
+	
+	## Check remaining required
+	assert_eq(upgrade.get_current_xp_required(), expected_required - partial_xp, 
+		"get_current_xp_required should subtract current XP")
+
+func test_serialize_deserialize_with_infinite():
+	## Setup original object
+	upgrade.enable_infinite_levels = true
+	upgrade.infinite_xp_pattern = Upgrade.GrowthPattern.EXPONENTIAL
+	upgrade.infinite_xp_multiplier = 1.75
+	upgrade.current_level = 2
+	upgrade.current_xp = 123
+	
+	## Serialize
+	var data = upgrade.to_dict()
+	
+	## Create new object and deserialize
+	var new_upgrade = Upgrade.new()
+	new_upgrade.level_configs = upgrade.level_configs  ## Need to copy configs
+	new_upgrade.init_upgrade(mock_stat_owner, mock_inventory)
+	new_upgrade.from_dict(data)
+	
+	## Verify serialized properties
+	assert_eq(new_upgrade.enable_infinite_levels, true, "enable_infinite_levels should serialize")
+	assert_eq(new_upgrade.infinite_xp_pattern, Upgrade.GrowthPattern.EXPONENTIAL, "infinite_xp_pattern should serialize")
+	assert_eq(new_upgrade.infinite_xp_multiplier, 1.75, "infinite_xp_multiplier should serialize")
+	assert_eq(new_upgrade.current_level, 2, "current_level should serialize")
+	assert_eq(new_upgrade.current_xp, 123, "current_xp should serialize")
+
+func test_has_preview_with_infinite():
+	## Setup
+	upgrade.enable_infinite_levels = true
+	
+	## Set to last level
+	var last_level = upgrade.level_configs.size()
+	upgrade.set_level(last_level)
+	
+	## Preview should be available if the last config has modifiers
+	var has_modifiers = upgrade.level_configs[-1].modifiers != null
+	assert_eq(upgrade.has_preview(), has_modifiers, 
+		"has_preview with infinite levels should check if last config has modifiers")
+	
+	## Get preview modifier set
+	if has_modifiers:
+		var preview_set = upgrade.get_preview_modifier_set()
+		assert_not_null(preview_set, "Preview modifier set should not be null")
+		
+		## The preview should be an extrapolated set
+		var extrapolated = upgrade._generate_extrapolated_config(last_level + 1)
+		
+		## First modifier in both sets should have same stat name
+		assert_eq(preview_set._modifiers[0]._stat_name, 
+				  extrapolated.modifiers._modifiers[0]._stat_name,
+				  "Preview modifiers should match extrapolated ones")

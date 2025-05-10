@@ -60,6 +60,43 @@ signal refund_applied(xp: int, materials: Dictionary)
 @export_tool_button("Generate Level Configs")
 var generate =_generate_level_configs
 
+## Growth pattern types for infinite levels
+enum GrowthPattern {
+	LINEAR,       ## Linear growth (base + multiplier * (level - last_level))
+	EXPONENTIAL,  ## Exponential growth (base * pow(multiplier, level - last_level))
+	POLYNOMIAL,   ## Polynomial growth (base * pow(level / last_level, exponent))
+	LOGARITHMIC,  ## Logarithmic growth (base * (1 + log(level / last_level) * multiplier))
+	CUSTOM        ## Use custom formula
+}
+
+@export_group("Infinite Level Settings")
+## If [code]true[/code], automatically attempts to upgrade whenever XP is added and requirements are met
+@export var enable_infinite_levels: bool = false
+## Growth pattern type for XP requirements
+@export var infinite_xp_pattern: GrowthPattern = GrowthPattern.EXPONENTIAL
+## Growth pattern type for material requirements
+@export var infinite_material_pattern: GrowthPattern = GrowthPattern.EXPONENTIAL
+## Growth pattern type for modifier values
+@export var infinite_modifier_pattern: GrowthPattern = GrowthPattern.EXPONENTIAL
+
+## Growth rate multiplier for XP in predefined patterns
+@export_range(1.01, 3.0) var infinite_xp_multiplier: float = 1.15
+## Growth rate multiplier for materials in predefined patterns
+@export_range(1.01, 3.0) var infinite_material_multiplier: float = 1.1
+## Growth rate multiplier for modifiers in predefined patterns
+@export_range(1.01, 3.0) var infinite_modifier_multiplier: float = 1.05
+
+## Exponent for polynomial growth (if selected)
+@export_range(1.1, 5.0) var infinite_xp_exponent: float = 2.0
+@export_range(1.1, 5.0) var infinite_material_exponent: float = 2.0
+@export_range(1.1, 5.0) var infinite_modifier_exponent: float = 1.5
+
+## Custom formulas (used only if corresponding pattern is set to CUSTOM)
+## Available variables: level (the target level), base (the base value), last_level (the last defined level)
+@export var infinite_xp_formula: String = "base * pow(1.15, level - last_level)"
+@export var infinite_material_formula: String = "base * pow(1.1, level - last_level)" 
+@export var infinite_modifier_formula: String = "base * pow(1.05, level - last_level)"
+
 ## The [StatModifierSet] currently applied by this upgrade track. Internal use.
 var _current_modifier: StatModifierSet = null
 ## The owner object whose stats will be modified. Must be set via [method init].
@@ -83,6 +120,90 @@ func init_upgrade(stat_owner: Object, inventory: Object) -> void:
 	assert(stat_owner.has_method("get_stat"), "parent must have get_stat method")
 	_stat_owner = stat_owner
 	_inventory = inventory
+
+## Calculates a value based on the selected growth pattern
+func _calculate_with_pattern(base_value: float, level: int, last_level: int, 
+							pattern: GrowthPattern, multiplier: float, 
+							exponent: float, custom_formula: String) -> float:
+	match pattern:
+		GrowthPattern.LINEAR:
+			return base_value + multiplier * (level - last_level)
+			
+		GrowthPattern.EXPONENTIAL:
+			return base_value * pow(multiplier, level - last_level)
+			
+		GrowthPattern.POLYNOMIAL:
+			return base_value * pow(float(level) / last_level, exponent)
+			
+		GrowthPattern.LOGARITHMIC:
+			# Ensure we don't take log of values <= 0
+			var log_input = max(float(level) / last_level, 1.01)
+			return base_value * (1.0 + log(log_input) * multiplier)
+			
+		GrowthPattern.CUSTOM:
+			var expression = Expression.new()
+			var error = expression.parse(custom_formula, ["level", "base", "last_level"])
+			if error != OK:
+				printerr("Upgrade: Error parsing custom formula: ", expression.get_error_text())
+				# Fall back to exponential
+				return base_value * pow(1.15, level - last_level)
+				
+			var result = expression.execute([level, base_value, last_level])
+			if expression.has_execute_failed() or not (typeof(result) in [TYPE_FLOAT, TYPE_INT]):
+				printerr("Upgrade: Error executing custom formula")
+				# Fall back to exponential
+				return base_value * pow(1.15, level - last_level)
+				
+			return float(result)
+			
+	# Default fallback
+	return base_value * pow(1.15, level - last_level)
+
+## Generates a level config for a level beyond the explicitly defined configs
+func _generate_extrapolated_config(level: int) -> UpgradeLevelConfig:
+	var last_level = level_configs.size()
+	var last_config = level_configs[last_level - 1]
+	var new_config = UpgradeLevelConfig.new()
+	
+	# Calculate XP using selected pattern
+	var xp_base = last_config.xp_required
+	var new_xp = _calculate_with_pattern(
+		xp_base, level, last_level,
+		infinite_xp_pattern, infinite_xp_multiplier,
+		infinite_xp_exponent, infinite_xp_formula
+	)
+	new_config.xp_required = int(max(1, new_xp))
+	
+	# Handle materials
+	if not last_config.required_materials.is_empty():
+		var mats: Dictionary[StringName, int] = {}
+		new_config.required_materials = mats
+		
+		for material in last_config.required_materials:
+			var mat_base = last_config.required_materials[material]
+			var new_amount = _calculate_with_pattern(
+				mat_base, level, last_level,
+				infinite_material_pattern, infinite_material_multiplier,
+				infinite_material_exponent, infinite_material_formula
+			)
+			new_config.required_materials[material] = int(max(1, new_amount))
+	
+	# Handle modifiers
+	if last_config.modifiers:
+		var new_modifiers = last_config.modifiers.copy()
+		
+		for mod in new_modifiers._modifiers:
+			var mod_base = mod._value
+			var new_value = _calculate_with_pattern(
+				mod_base, level, last_level,
+				infinite_modifier_pattern, infinite_modifier_multiplier,
+				infinite_modifier_exponent, infinite_modifier_formula
+			)
+			mod._value = new_value
+			
+		new_config.modifiers = new_modifiers
+	
+	return new_config
 
 ## Generates level configurations based on the auto-generate settings
 func _generate_level_configs() -> void:
@@ -133,7 +254,7 @@ func _generate_level_configs() -> void:
 		# Interpolate modifiers if both configs have them
 		if first_upgrade.modifiers and last_upgrade.modifiers:
 			var modifier_factor = modifier_curve.sample(t)
-			var new_modifiers: StatModifierSet = first_upgrade.modifiers.duplicate()
+			var new_modifiers: StatModifierSet = first_upgrade.modifiers.copy()
 			for f in range(min(len(new_modifiers._modifiers), len(last_upgrade.modifiers._modifiers))):
 				var current = new_modifiers._modifiers[f]
 				var target = last_upgrade.modifiers._modifiers[f]
@@ -155,11 +276,13 @@ func _validate_auto_generate() -> void:
 ## Adds experience points to the track.[br]
 ## If [member auto_upgrade] is [code]true[/code], it will attempt to level up if requirements are met by calling [method do_upgrade].[br]
 ## [param amount]: The amount of XP to add. Should be non-negative.[br]
-func add_xp(amount: int) -> bool:
+func add_xp(amount: int, accumulate: bool = false) -> bool:
 	if amount <= 0:
 		printerr("UpgradeTrack: Cannot add negative or zero XP.")
 		return false
-	if _is_max_level(): # Don't add XP if already max level
+	if _is_max_level():
+		if accumulate:
+			current_xp += amount
 		return false
 
 	current_xp += amount
@@ -175,13 +298,19 @@ func add_xp(amount: int) -> bool:
 ## Returns 0 if the track is already at the maximum level.[br]
 ## [return]: The required XP defined in the [UpgradeLevelConfig] for the current target level, or 0 if max level reached.[br]
 func get_current_xp_required() -> int:
-	if _is_max_level():
+	if not enable_infinite_levels and _is_max_level():
 		return 0
-	# Check bounds before accessing
+		
+	var required: int
 	if current_level >= level_configs.size():
-		printerr("UpgradeTrack: current_level is out of bounds for level_configs in get_current_xp_required.")
-		return 9223372036854775807 # INT64_MAX in GDScript
-	return max(0, level_configs[current_level].xp_required - current_xp)
+		if not enable_infinite_levels:
+			return 0
+		var extrapolated_config = _generate_extrapolated_config(current_level + 1)
+		required = extrapolated_config.xp_required
+	else:
+		required = level_configs[current_level].xp_required
+		
+	return max(0, required - current_xp)
 
 ## Gets the current level of the upgrade track.
 func get_current_level() -> int:
@@ -198,18 +327,19 @@ func get_progress_ratio() -> float:
 ## Internal use.[br]
 ## [return]: [code]true[/code] if the track can level up, [code]false[/code] otherwise.[br]
 func can_upgrade(added_xp: int=0) -> bool:
-	if _is_max_level():
+	if not enable_infinite_levels and _is_max_level():
 		return false
 
-	# Ensure level_configs has an entry for the current level
+	var config: UpgradeLevelConfig
 	if current_level >= level_configs.size():
-		printerr("UpgradeTrack: Current level %d is out of bounds for level_configs (size %d)." % [current_level, level_configs.size()])
-		return false
-
-	var config: UpgradeLevelConfig = level_configs[current_level]
+		if not enable_infinite_levels:
+			return false
+		config = _generate_extrapolated_config(current_level + 1)
+	else:
+		config = level_configs[current_level]
 
 	# Check materials
-	if config.required_materials and not config.required_materials.is_empty(): # Check if dictionary exists and is not empty
+	if config.required_materials and not config.required_materials.is_empty():
 		if not is_instance_valid(_inventory):
 			printerr("UpgradeTrack: Inventory not initialized or invalid!")
 			return false
@@ -239,11 +369,14 @@ func set_level(level: int=1) -> bool:
 		printerr("UpgradeTrack: Cannot set level to a negative number or zero.")
 		return false
 	
+	var config: UpgradeLevelConfig
 	if level > level_configs.size():
-		printerr("UpgradeTrack: Level %d is out of bounds for level_configs (size %d)." % [level, level_configs.size()])
-		return false
-
-	var config: UpgradeLevelConfig = level_configs[level - 1]
+		if not enable_infinite_levels:
+			printerr("UpgradeTrack: Level %d is out of bounds for level_configs (size %d)." % [level, level_configs.size()])
+			return false
+		config = _generate_extrapolated_config(level)
+	else:
+		config = level_configs[level - 1]
 
 	remove_current_upgrade()
 
@@ -259,7 +392,7 @@ func set_level(level: int=1) -> bool:
 	if step_levels.has(current_level):
 		emit_signal("step_reached", current_level)
 
-	if _is_max_level():
+	if not enable_infinite_levels and _is_max_level():
 		emit_signal("max_level_reached")
 	
 	return true
@@ -276,7 +409,13 @@ func do_upgrade() -> bool:
 		printerr("Upgrade: Stat owner invalid during upgrade.")
 		return false
 
-	var config: UpgradeLevelConfig = level_configs[current_level]
+	var config: UpgradeLevelConfig
+	if current_level >= level_configs.size():
+		if not enable_infinite_levels:
+			return false
+		config = _generate_extrapolated_config(current_level + 1)
+	else:
+		config = level_configs[current_level]
 
 	# Deduct materials
 	if _inventory and config.required_materials:
@@ -294,16 +433,15 @@ func do_upgrade() -> bool:
 
 	# Deduct XP and increment level
 	current_xp -= config.xp_required
-	current_level += 1 # Increment level *after* processing the config for the completed level
+	current_level += 1
 
 	# Emit signals AFTER state is updated
-	# Pass the config of the level that was just *completed* / *applied*
-	emit_signal("upgrade_applied", current_level, config) # current_level is now the new level number
+	emit_signal("upgrade_applied", current_level, config)
 
 	if step_levels.has(current_level):
 		emit_signal("step_reached", current_level)
 
-	if _is_max_level():
+	if not enable_infinite_levels and _is_max_level():
 		emit_signal("max_level_reached")
 	
 	return true
@@ -322,7 +460,7 @@ func remove_current_upgrade() -> void:
 ## Internal use.[br]
 ## [return]: [code]true[/code] if the maximum level has been reached or exceeded, [code]false[/code] otherwise.[br]
 func _is_max_level() -> bool:
-	return current_level >= level_configs.size()
+	return not enable_infinite_levels and current_level >= level_configs.size()
 
 # --- PREVIEW SYSTEM ---
 
@@ -330,10 +468,15 @@ func _is_max_level() -> bool:
 ## [return]: [code]true[/code] if not at max level and the next level config ([code]level_configs[current_level][/code]) has a valid [member UpgradeLevelConfig.modifiers] set.[br]
 func has_preview() -> bool:
 	# Check bounds first
-	if _is_max_level() or current_level < 0: # current_level should not be < 0, but safety check
+	if not enable_infinite_levels and _is_max_level(): 
 		return false
-	# Check if the config at the current level exists and has modifiers
-	return level_configs[current_level].modifiers != null
+
+	if current_level < level_configs.size():
+		# Check if the config at the current level exists and has modifiers
+		return level_configs[current_level].modifiers != null
+	else:
+		# For extrapolated levels, check if the last config has modifiers
+		return level_configs.size() > 0 and level_configs[-1].modifiers != null
 
 ## Gets the [StatModifierSet] associated with the *next* upgrade level configuration.[br]
 ## Assumes [method has_preview] is true when calling.[br]
@@ -342,8 +485,13 @@ func get_preview_modifier_set() -> StatModifierSet:
 	if not has_preview():
 		printerr("UpgradeTrack: get_preview_modifier_set called when no preview is available.")
 		return null
-	# Bounds already checked by has_preview implicitly
-	return level_configs[current_level].modifiers
+		
+	if current_level < level_configs.size():
+		return level_configs[current_level].modifiers
+	else:
+		# For extrapolated levels, generate a config
+		var extrapolated = _generate_extrapolated_config(current_level + 1)
+		return extrapolated.modifiers
 
 ## Simulates the effect of the next upgrade's modifiers without applying them permanently.[br]
 ## Useful for displaying potential stat changes in UI.[br]
@@ -416,13 +564,18 @@ func reset_upgrades() -> void:
 	current_level = 0
 	current_xp = 0
 
-## Converts the upgrade's current state to a dictionary for serialization.[br]
-## [return]: A [Dictionary] containing the upgrade's serializable state.
 func to_dict() -> Dictionary:
 	var data := {
 		"current_level": current_level,
 		"current_xp": current_xp,
 		"auto_upgrade": auto_upgrade,
+		"enable_infinite_levels": enable_infinite_levels,
+		"infinite_xp_pattern": infinite_xp_pattern,
+		"infinite_material_pattern": infinite_material_pattern,
+		"infinite_modifier_pattern": infinite_modifier_pattern,
+		"infinite_xp_multiplier": infinite_xp_multiplier,
+		"infinite_material_multiplier": infinite_material_multiplier,
+		"infinite_modifier_multiplier": infinite_modifier_multiplier,
 	}
 	
 	# Save current modifier state if exists
@@ -431,28 +584,37 @@ func to_dict() -> Dictionary:
 		
 	return data
 
-## Restores the upgrade's state from a dictionary.[br]
-## [param data]: The [Dictionary] containing the upgrade state to restore.[br]
-## [return]: [code]true[/code] if successful, [code]false[/code] otherwise.
 func from_dict(data: Dictionary) -> bool:
 	# Check for required keys
-	if not data.has("current_level") or not data.has("current_xp") or not data.has("auto_upgrade"):
+	if not data.has("current_level") or not data.has("current_xp"):
 		return false
 	
 	# Reset current state
 	reset_upgrades()
 	
 	# Restore values
-	auto_upgrade = data.get("auto_upgrade")
-	current_xp = data.get("current_xp")	
-
-	# Set level last as it will apply modifiers
-	if not set_level(data.get("current_level", 0)):
-		return false
+	auto_upgrade = data.get("auto_upgrade", auto_upgrade)
+	enable_infinite_levels = data.get("enable_infinite_levels", enable_infinite_levels)
+	
+	# Restore pattern settings if available
+	infinite_xp_pattern = data.get("infinite_xp_pattern", infinite_xp_pattern)
+	infinite_material_pattern = data.get("infinite_material_pattern", infinite_material_pattern)
+	infinite_modifier_pattern = data.get("infinite_modifier_pattern", infinite_modifier_pattern)
+	
+	# Restore growth multipliers if available
+	infinite_xp_multiplier = data.get("infinite_xp_multiplier", infinite_xp_multiplier)
+	infinite_material_multiplier = data.get("infinite_material_multiplier", infinite_material_multiplier)
+	infinite_modifier_multiplier = data.get("infinite_modifier_multiplier", infinite_modifier_multiplier)
+	
+	current_xp = data.get("current_xp")
+	
+	current_level = data.get("current_level")
 	
 	# Restore modifier state if present
 	var current_modifier_data = data.get("current_modifier")
 	if current_modifier_data and _current_modifier.has_method("from_dict"):
+		if _current_modifier == null:
+			_current_modifier = StatModifierSet.new()
 		_current_modifier.from_dict(current_modifier_data)
 	
 	return true

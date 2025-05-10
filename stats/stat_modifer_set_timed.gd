@@ -1,3 +1,4 @@
+@tool
 extends StatModifierSet
 
 ## A timed version of StatModifierSet that can apply effects based on time intervals or total duration.
@@ -207,9 +208,9 @@ func to_dict() -> Dictionary:
 
 ## Loads this timed modifier set from a dictionary.[br]
 ## [param data]: Dictionary containing properties to load.
-func from_dict(data: Dictionary) -> void:
+func from_dict(data: Dictionary, parent: Object = null) -> void:
 	# Call parent method to set base properties
-	super.from_dict(data)
+	super.from_dict(data, parent)
 	
 	# Load timed-specific properties
 	apply_at_start = data.get("apply_at_start", true)

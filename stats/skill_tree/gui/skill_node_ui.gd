@@ -1,7 +1,7 @@
 class_name SkillNodeUI
 extends Control
 
-signal on_upgrade(level)
+signal on_upgrade(node_ui, level)
 signal on_unlocked(node_ui)
 signal on_node_clicked(node_ui)
 
@@ -152,7 +152,7 @@ func upgrade() -> bool:
 		if old_level == 0 and new_level == 1:
 			_invested()
 		
-		on_upgrade.emit(new_level)
+		on_upgrade.emit(self, new_level)
 		
 		# Play animation if level actually changed
 		if new_level > old_level:

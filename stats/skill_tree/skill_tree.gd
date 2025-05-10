@@ -18,6 +18,7 @@ var _inventory: Object
 # Reference to the parent object
 var _parent: Object
 
+# MAX, Step
 enum UnlockStrategy {
 	ALL_PARENTS_TOTAL_LEVEL,
 	ANY_PARENT_UNLOCKED,
