@@ -580,7 +580,10 @@ func to_dict() -> Dictionary:
 	
 	# Save current modifier state if exists
 	if _current_modifier:
-		data["current_modifier"] = _current_modifier.to_dict() if _current_modifier.has_method("to_dict") else {}
+		data["current_modifier"] = {
+			"class_type": _current_modifier.get_script().get_global_name(),
+			"data": _current_modifier.to_dict() if _current_modifier.has_method("to_dict") else {}
+		}
 		
 	return data
 
@@ -607,14 +610,32 @@ func from_dict(data: Dictionary) -> bool:
 	infinite_modifier_multiplier = data.get("infinite_modifier_multiplier", infinite_modifier_multiplier)
 	
 	current_xp = data.get("current_xp")
-	
 	current_level = data.get("current_level")
 	
 	# Restore modifier state if present
 	var current_modifier_data = data.get("current_modifier")
-	if current_modifier_data and _current_modifier.has_method("from_dict"):
-		if _current_modifier == null:
-			_current_modifier = StatModifierSet.new()
-		_current_modifier.from_dict(current_modifier_data)
+	if current_modifier_data:
+		var class_type = current_modifier_data.get("class_type", "StatModifierSet")
+		_current_modifier = _instantiate_class(class_type)
+		if _current_modifier and _current_modifier.has_method("from_dict"):
+			_current_modifier.from_dict(current_modifier_data.get("data", {}))
 	
 	return true
+
+func _instantiate_class(class_type: String) -> Object:
+	var global_classes = ProjectSettings.get_global_class_list()
+	
+	# Find the class in the global class list
+	for gc in global_classes:
+		if gc["class"] == class_type:
+			# Load the script and instantiate it
+			var script = load(gc["path"])
+			if script:
+				return script.new()
+	
+	# Fallback for built-in classes or if not found in global class list
+	if class_type == "StatModifierSet":
+		return StatModifierSet.new()
+	else:
+		push_warning("Unknown class type: %s, defaulting to StatModifierSet." % class_type)
+		return StatModifierSet.new()
