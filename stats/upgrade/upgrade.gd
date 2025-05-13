@@ -354,11 +354,9 @@ func can_upgrade(added_xp: int=0) -> bool:
 ## Returns [code]true[/code] if the level up was successful, [code]false[/code] otherwise.[br]
 func level_up() -> bool:
 	if get_current_xp_required() == 0:
-		if _is_max_level(): # Don't add XP if already max level
-			return false
-		if can_upgrade():
-			return do_upgrade()
-		return false
+		if _is_max_level():
+			return false		
+		return do_upgrade()
 	return add_xp(get_current_xp_required())
 
 ## Sets the level of the upgrade track.[br]
@@ -400,9 +398,9 @@ func set_level(level: int=1) -> bool:
 ## Performs the upgrade process.[br]
 ## Removes previous modifiers, deducts materials and XP, applies new modifiers,
 ## increments the level, and emits relevant signals. Internal use.
-func do_upgrade() -> bool:
+func do_upgrade(ignore_cost: bool = false) -> bool:
 	# Double check conditions before proceeding
-	if not can_upgrade():
+	if not can_upgrade() and not ignore_cost:
 		printerr("Upgrade: do_upgrade called when can_upgrade is false.")
 		return false
 	if not is_instance_valid(_stat_owner):
@@ -418,7 +416,7 @@ func do_upgrade() -> bool:
 		config = level_configs[current_level]
 
 	# Deduct materials
-	if _inventory and config.required_materials:
+	if (_inventory and config.required_materials) and not ignore_cost:
 		if not _inventory.consume_materials(config.required_materials):
 			printerr("Upgrade: Failed to consume required materials for upgrade.")
 			return false
@@ -428,11 +426,13 @@ func do_upgrade() -> bool:
 
 	# Apply new modifiers for the level being entered
 	if config.modifiers:
+		config.modifiers._apply = true
 		config.modifiers.init_modifiers(_stat_owner)
 		_current_modifier = config.modifiers
 
 	# Deduct XP and increment level
-	current_xp -= config.xp_required
+	if not ignore_cost:
+		current_xp -= config.xp_required
 	current_level += 1
 
 	# Emit signals AFTER state is updated

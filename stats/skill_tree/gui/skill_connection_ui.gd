@@ -13,8 +13,8 @@ extends Control
 
 var activation_tween: Tween
 
-var start_node: Control
-var end_node: Control
+@export var start_node: Control
+@export var end_node: Control
 var is_active := false
 
 # Called when the node enters the scene tree

@@ -11,18 +11,17 @@ signal skill_points_changed(new_amount)
 @export_storage var _connections: Dictionary = {}
 # Skill points available for spending (now primarily used for upgrades, not unlocking)
 @export var skill_points: int = 0
-# Automatically upgrade child _nodes to level 1 when a parent node is unlocked
-@export var auto_upgrade_on_unlock: bool = false
 # Reference to the inventory for material costs
 var _inventory: Object
 # Reference to the parent object
 var _parent: Object
 
-# MAX, Step
 enum UnlockStrategy {
 	ALL_PARENTS_TOTAL_LEVEL,
 	ANY_PARENT_UNLOCKED,
-	EACH_PARENT_MIN_LEVEL
+	EACH_PARENT_MIN_LEVEL,
+	ALL_MAX_LEVEL,
+	ALL_STEPS
 }
 
 @export var unlock_strategy := UnlockStrategy.ALL_PARENTS_TOTAL_LEVEL

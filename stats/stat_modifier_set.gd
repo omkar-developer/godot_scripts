@@ -280,7 +280,9 @@ func to_dict() -> Dictionary:
 		"condition_apply_on_start": _condition_apply_on_start,
 		"condition_pause_process": _condition_pause_process,
 		"apply_on_condition_change": apply_on_condition_change,
-		"remove_on_condition_change": remove_on_condition_change
+		"remove_on_condition_change": remove_on_condition_change,
+		"apply": _apply,
+		"consumable": consumable
 	}
 
 ## Loads this modifier set from a dictionary.
@@ -303,20 +305,21 @@ func from_dict(data: Dictionary, parent: Object = null) -> void:
 	_modifier_name = data.get("modifier_name", "")
 	_group = data.get("group", "")
 	process = data.get("process", false)
+	_marked_for_deletion = data.get("marked_for_deletion", false)
+	_remove_all = data.get("remove_all", true)
+	merge_enabled = data.get("merge_enabled", true)
+	_condition_apply_on_start = data.get("condition_apply_on_start", true)
+	_condition_pause_process = data.get("condition_pause_process", false)
+	apply_on_condition_change = data.get("apply_on_condition_change", true)
+	remove_on_condition_change = data.get("remove_on_condition_change", true)
+	_apply = data.get("apply", true)
+	consumable = data.get("consumable", false)
 
 	if data.has("condition_class") and data["condition_class"] != "":
 		condition = _instantiate_class(data["condition_class"])
 		condition.from_dict(data["condition"])
 		condition.init_stat(_parent)
 		_connect_condition()
-
-	_marked_for_deletion = data.get("marked_for_deletion", false)
-	_remove_all = data.get("remove_all", false)
-	merge_enabled = data.get("merge_enabled", false)
-	_condition_apply_on_start = data.get("condition_apply_on_start", false)
-	_condition_pause_process = data.get("condition_pause_process", false)
-	apply_on_condition_change = data.get("apply_on_condition_change", false)
-	remove_on_condition_change = data.get("remove_on_condition_change", false)
 
 func _instantiate_class(class_type: String) -> Object:
 	var global_classes = ProjectSettings.get_global_class_list()

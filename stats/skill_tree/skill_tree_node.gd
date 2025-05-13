@@ -35,6 +35,8 @@ func init_node(stat_owner: Object, inventory: Object = null, _skill_tree: SkillT
 	self.skill_tree = _skill_tree
 	if upgrade:
 		upgrade.init_upgrade(stat_owner, inventory)
+		if auto_upgrade_to_level_1 and upgrade.get_current_level() == 0:
+			upgrade_level(true)
 	else:
 		printerr("SkillTreeNode : Upgrade resource not set!")
 
@@ -47,10 +49,10 @@ func unlock() -> void:
 	unlocked = true
 
 # Attempt to upgrade the node's level.
-func upgrade_level() -> bool:
+func upgrade_level(ignore_cost: bool = false) -> bool:
 	if not is_instance_valid(upgrade):
 		return false
-	if skill_tree:
+	if skill_tree and not ignore_cost:
 		if skill_tree.skill_points < upgrade.get_current_xp_required():
 			return false
 	if upgrade.level_up():
