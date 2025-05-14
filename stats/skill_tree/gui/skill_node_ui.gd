@@ -4,6 +4,7 @@ extends Control
 signal on_upgrade(node_ui, level)
 signal on_unlocked(node_ui)
 signal on_node_clicked(node_ui)
+signal on_focus_changed(node_ui, focused)  # New signal
 
 @export var node_id: StringName
 @export var skill_node: SkillTreeNode
@@ -16,7 +17,7 @@ signal on_node_clicked(node_ui)
 @export var unlocked_color: Color = Color(0.7, 0.7, 0.7, 1.0)       # Node is unlocked but level 0
 @export var invested_color: Color = Color.WHITE                     # Node has points invested (level 1+)
 @export var hover_color: Color = Color(1.2, 1.2, 1.2, 1.0)          # Hover effect
-@export var selected_color: Color = Color(1.4, 1.4, 0.6, 1.0)       # Selection highlight
+@export var selected_color: Color = Color.WHITE       				# Selection highlight
 @export var hover_scale: Vector2 = Vector2(1.1, 1.1)
 
 # Visual components visibility
@@ -35,6 +36,7 @@ signal on_node_clicked(node_ui)
 @onready var level_label = %LevelLabel
 @onready var background = %Background
 @onready var lock_icon = %LockIcon if has_node("%LockIcon") else null
+@onready var selection_indicator = %Selection if has_node("%Selection") else null
 
 # State variables
 var is_hovered: bool = false
@@ -196,34 +198,15 @@ func _update_level_label() -> void:
 
 # Highlight the node (for hover or selection)
 func _highlighted(highlight: bool = true) -> void:
-	if hover_tween:
-		hover_tween.kill()
-	
-	hover_tween = create_tween().set_parallel()
-	
-	if highlight:
-		# Target color based on selection state
-		var target_color = selected_color if is_selected else hover_color
-		
-		# Scale up animation
-		hover_tween.tween_property(self, "scale", hover_scale, hover_animation_duration).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-		
-		# Color animation
-		hover_tween.tween_property(icon, "self_modulate", target_color, hover_animation_duration).set_trans(Tween.TRANS_CUBIC)
-	else:
-		# Target color based on selection and state
-		var target_color = selected_color if is_selected else normal_color
-		
-		# Scale down animation
-		hover_tween.tween_property(self, "scale", Vector2.ONE, hover_animation_duration).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-		
-		# Color animation
-		hover_tween.tween_property(icon, "self_modulate", target_color, hover_animation_duration).set_trans(Tween.TRANS_CUBIC)
+	is_hovered = highlight
+	_set_style()
 
 # Set the selected state
 func set_selected(selected: bool = true) -> void:
 	is_selected = selected
-	_highlighted(is_hovered)
+	if selection_indicator:
+		selection_indicator.visible = selected
+	_set_style()
 
 # Input Handling
 func _on_mouse_entered() -> void:
@@ -232,11 +215,11 @@ func _on_mouse_entered() -> void:
 	if not skill_node.is_unlocked():
 		return
 	is_hovered = true
-	_highlighted(true)
+	_set_style()
 
 func _on_mouse_exited() -> void:
 	is_hovered = false
-	_highlighted(false)
+	_set_style()
 
 func _on_gui_input(event: InputEvent) -> void:	
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -277,11 +260,15 @@ func _play_press_animation() -> void:
 
 func _on_focus_entered() -> void:
 	is_hovered = true
-	_highlighted(true)
+	set_selected(true)
+	_set_style()
+	on_focus_changed.emit(self, true)
 
 func _on_focus_exited() -> void:
 	is_hovered = false
-	_highlighted(false)
+	set_selected(false)
+	_set_style()
+	on_focus_changed.emit(self, false)
 
 # Public methods for external control
 
@@ -291,10 +278,29 @@ func init_upgrade(stat_owner: Object, inventory: Object = null, tree: SkillTree 
 
 # Refresh node state based on the current skill node state
 func refresh_node_state() -> void:
-	# Determine the current state
 	node_state = get_node_state()
+	_set_style(false)  # No animation for initial state
+
+# Refresh the node's visual state (call after skill_node changes)
+func refresh_node() -> void:
+	if skill_node:
+		refresh_node_state()
+		_update_level_label()
+		
+		# Apply current hover/selection state
+		if is_hovered or is_selected:
+			_set_style()
+
+# Unlock the node
+func unlock() -> void:
+	if skill_node:
+		skill_node.unlock()
+
+func _set_style(animate: bool = true) -> void:
+	var target_color: Color
+	var target_scale: Vector2
 	
-	# Set the appropriate color based on state
+	# Determine base color from node state
 	match node_state:
 		NodeState.LOCKED:
 			normal_color = locked_color
@@ -315,20 +321,23 @@ func refresh_node_state() -> void:
 			if hide_level_when_locked:
 				level_label.visible = true
 	
-	# Apply the color
-	icon.self_modulate = normal_color
-
-# Refresh the node's visual state (call after skill_node changes)
-func refresh_node() -> void:
-	if skill_node:
-		refresh_node_state()
-		_update_level_label()
-		
-		# Apply current hover/selection state
-		if is_hovered or is_selected:
-			_highlighted(true)
-
-# Unlock the node
-func unlock() -> void:
-	if skill_node:
-		skill_node.unlock()
+	# Apply visual state based on selection/hover/focus
+	if is_selected:
+		target_color = selected_color
+		target_scale = hover_scale if is_hovered else Vector2.ONE
+	elif is_hovered:
+		target_color = hover_color
+		target_scale = hover_scale
+	else:
+		target_color = normal_color
+		target_scale = Vector2.ONE
+	
+	if animate:
+		if hover_tween:
+			hover_tween.kill()
+		hover_tween = create_tween().set_parallel()
+		hover_tween.tween_property(self, "scale", target_scale, hover_animation_duration).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		hover_tween.tween_property(icon, "self_modulate", target_color, hover_animation_duration).set_trans(Tween.TRANS_CUBIC)
+	else:
+		scale = target_scale
+		icon.self_modulate = target_color

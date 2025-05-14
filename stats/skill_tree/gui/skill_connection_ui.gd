@@ -10,6 +10,7 @@ extends Control
 @export var active_color := Color(0.2, 0.8, 0.2)
 @export var animation_duration: float = 0.5
 @export var glow_strength: float = 1.5
+@export var enable_animation := true
 
 var activation_tween: Tween
 
@@ -28,6 +29,13 @@ func setup(from_node: Control, to_node: Control) -> void:
 	update_connection()
 	_set_style()
 
+func setup_style(_normal_color: Color, _active_color: Color, _line_width: float = -1.0) -> void:
+	connection_color = _normal_color
+	active_color = _active_color
+	if _line_width > 0.0:
+		self.line_width = _line_width
+	_set_style()
+
 func update_requirement_text(skill_tree: SkillTree) -> void:
 	if not show_requirements or not requirement_label or not end_node:
 		return
@@ -36,6 +44,15 @@ func update_requirement_text(skill_tree: SkillTree) -> void:
 	requirement_label.text = req_text
 
 func _play_activation_animation() -> void:
+	if not line:
+		return
+	
+	if not enable_animation:
+		line.default_color = active_color
+		line.width = line_width
+		line.modulate = Color.WHITE
+		return
+		
 	if activation_tween:
 		activation_tween.kill()
 	
@@ -52,14 +69,14 @@ func _play_activation_animation() -> void:
 	activation_tween.chain().tween_property(line, "width", original_width, animation_duration * 0.7)\
 		.set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 	
-	# Optional: Animate modulate for overall glow effect
+	# Animate modulate for overall glow effect
 	activation_tween.tween_property(line, "modulate", Color(1.2, 1.2, 1.2, 1), animation_duration * 0.3)
 	activation_tween.chain().tween_property(line, "modulate", Color.WHITE, animation_duration * 0.7)
 
 func _set_style() -> void:
 	if is_active:
 		_play_activation_animation()
-	else:
+	elif line:
 		line.width = line_width
 		line.modulate = Color.WHITE
 		line.default_color = active_color if is_active else connection_color

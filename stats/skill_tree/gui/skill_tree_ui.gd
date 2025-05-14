@@ -29,9 +29,11 @@ var node_ui_elements: Dictionary = {}  # Maps node_id to SkillNodeUI
 var connections: Array[SkillConnectionUI] = []  # Stores all connection objects
 
 # Connection visual settings
-@export var connection_color_normal: Color = Color(0.5, 0.5, 0.5, 0.7)
-@export var connection_color_active: Color = Color(0.2, 0.8, 0.2, 1.0)
-@export var connection_width: float = 2.0
+@export_group("Connection Settings")
+@export var set_connection_color: bool = false
+@export var color_normal: Color = Color(0.5, 0.5, 0.5, 0.7)
+@export var color_active: Color = Color(0.2, 0.8, 0.2, 1.0)
+@export var line_width: float = 2.0
 
 func _enter_tree() -> void:
 	if stats_owner == null:
@@ -131,6 +133,8 @@ func _find_connections_recursive(node: Node, existing_connections: Dictionary) -
 	for child in node.get_children():
 		if child is SkillConnectionUI:
 			var connection := child as SkillConnectionUI
+			if set_connection_color:
+				connection.setup_style(color_normal, color_active, line_width)
 			if connection.start_node and connection.end_node:
 				var from_node_ui = connection.start_node as SkillNodeUI
 				var to_node_ui = connection.end_node as SkillNodeUI
@@ -143,9 +147,16 @@ func _find_connections_recursive(node: Node, existing_connections: Dictionary) -
 					# Mark as preexisting connection
 					connection.add_to_group("preexisting_connection")
 					
-					# Update connection style
-					if skill_tree and skill_tree._nodes.has(from_node_ui.node_id):
-						var is_active = skill_tree._nodes[from_node_ui.node_id].is_unlocked()
+					 # Add connection to skill tree data structure if it doesn't exist
+					if skill_tree:
+						if !skill_tree._connections.has(from_node_ui.node_id):
+							skill_tree._connections[from_node_ui.node_id] = []
+						if !skill_tree._connections[from_node_ui.node_id].has(to_node_ui.node_id):
+							skill_tree.add_connection(from_node_ui.node_id, to_node_ui.node_id)
+					
+					# Update connection style - check both nodes are unlocked
+					if skill_tree and skill_tree._nodes.has(from_node_ui.node_id) and skill_tree._nodes.has(to_node_ui.node_id):
+						var is_active = skill_tree._nodes[from_node_ui.node_id].is_unlocked() and skill_tree._nodes[to_node_ui.node_id].is_unlocked()
 						connection.set_active(is_active)
 					
 					connections.append(connection)
@@ -178,6 +189,8 @@ func _create_connections_from_skill_tree(existing_connections: Dictionary) -> vo
 				
 			# Create the connection
 			var connection = skill_connection_scene.instantiate() as SkillConnectionUI
+			if set_connection_color:
+				connection.setup_style(color_normal, color_active, line_width)
 			add_child(connection)
 			connection.setup(from_node_ui, to_node_ui)
 			
@@ -219,6 +232,8 @@ func _create_connections_from_node_ui_children(existing_connections: Dictionary)
 					
 					# Create the connection
 					var connection = skill_connection_scene.instantiate() as SkillConnectionUI
+					if set_connection_color:
+						connection.setup_style(color_normal, color_active, line_width)
 					add_child(connection)
 					connection.setup(from_node_ui, child_node_ui)
 					
