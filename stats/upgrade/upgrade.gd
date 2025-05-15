@@ -161,6 +161,10 @@ func _calculate_with_pattern(base_value: float, level: int, last_level: int,
 
 ## Generates a level config for a level beyond the explicitly defined configs
 func _generate_extrapolated_config(level: int) -> UpgradeLevelConfig:
+	if level_configs.is_empty():
+		push_error("Cannot extrapolate config: no base configs defined")
+		return null
+		
 	var last_level = level_configs.size()
 	var last_config = level_configs[last_level - 1]
 	var new_config = UpgradeLevelConfig.new()
@@ -318,7 +322,7 @@ func get_current_level() -> int:
 
 ## Calculates the progress towards the next level as a ratio between 0.0 and 1.0.[br]
 ## Returns 1.0 if the required XP is 0 (e.g., at max level or if config has 0 XP).[br]
-## [return]: The progress ratio ([code]current_xp / required_xp[/code]), clamped between 0.0 and 1.0.[br]
+## [return]: The progress ratio ([code]current_xp / required_xp[/code]), clamped between 0.0 and 1.0).[br]
 func get_progress_ratio() -> float:
 	var required = get_current_xp_required()
 	return clamp(float(current_xp) / required, 0.0, 1.0) if required > 0 else 1.0
@@ -451,7 +455,12 @@ func do_upgrade(ignore_cost: bool = false) -> bool:
 ## Does [b]not[/b] emit the [signal upgrade_removed] signal; that is handled by [method do_upgrade].
 func remove_current_upgrade() -> void:
 	if _current_modifier:
-		var config = level_configs[current_level - 1]
+		var config: UpgradeLevelConfig
+		if current_level > level_configs.size():
+			config = _generate_extrapolated_config(current_level)
+		else:
+			config = level_configs[current_level - 1]
+		
 		_current_modifier.uninit_modifiers()
 		_current_modifier = null
 		emit_signal("upgrade_removed", current_level, config)
@@ -486,12 +495,14 @@ func get_preview_modifier_set() -> StatModifierSet:
 		printerr("UpgradeTrack: get_preview_modifier_set called when no preview is available.")
 		return null
 		
-	if current_level < level_configs.size():
-		return level_configs[current_level].modifiers
+	var config: UpgradeLevelConfig
+	if current_level >= level_configs.size():
+		if not enable_infinite_levels:
+			return null
+		config = _generate_extrapolated_config(current_level + 1)
+		return config.modifiers if config else null
 	else:
-		# For extrapolated levels, generate a config
-		var extrapolated = _generate_extrapolated_config(current_level + 1)
-		return extrapolated.modifiers
+		return level_configs[current_level].modifiers
 
 ## Simulates the effect of the next upgrade's modifiers without applying them permanently.[br]
 ## Useful for displaying potential stat changes in UI.[br]
@@ -520,7 +531,15 @@ func get_total_refund() -> Dictionary:
 	var material_refund := {}
 
 	for i in range(current_level):
-		var config := level_configs[i]
+		var config: UpgradeLevelConfig
+		if i >= level_configs.size():
+			if not enable_infinite_levels:
+				break
+			config = _generate_extrapolated_config(i + 1)
+			if not config:
+				break
+		else:
+			config = level_configs[i]
 
 		xp_refund += config.xp_required
 
@@ -564,6 +583,7 @@ func reset_upgrades() -> void:
 	current_level = 0
 	current_xp = 0
 
+## Returns a [Dictionary] representing the current upgrade track state.
 func to_dict() -> Dictionary:
 	var data := {
 		"current_level": current_level,
@@ -587,6 +607,7 @@ func to_dict() -> Dictionary:
 		
 	return data
 
+## Restores the upgrade track state from a [Dictionary].
 func from_dict(data: Dictionary) -> bool:
 	# Check for required keys
 	if not data.has("current_level") or not data.has("current_xp"):
@@ -622,6 +643,7 @@ func from_dict(data: Dictionary) -> bool:
 	
 	return true
 
+## Instantiates a class from its global class name.
 func _instantiate_class(class_type: String) -> Object:
 	var global_classes = ProjectSettings.get_global_class_list()
 	
