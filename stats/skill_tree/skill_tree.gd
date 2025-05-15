@@ -11,17 +11,21 @@ signal skill_points_changed(new_amount)
 @export_storage var _connections: Dictionary = {}
 # Skill points available for spending (now primarily used for upgrades, not unlocking)
 @export var skill_points: int = 0
+
+var unlock_strategy_text_func: Callable
+var unlock_strategy_func: Callable
 # Reference to the inventory for material costs
 var _inventory: Object
 # Reference to the parent object
 var _parent: Object
 
 enum UnlockStrategy {
-	ALL_PARENTS_TOTAL_LEVEL,
-	ANY_PARENT_UNLOCKED,
-	EACH_PARENT_MIN_LEVEL,
-	ALL_MAX_LEVEL,
-	ALL_STEPS
+	ALL_PARENTS_TOTAL_LEVEL,  # Unlocks when sum of all parent levels >= required level
+	ANY_PARENT_UNLOCKED,      # Unlocks when any parent reaches required level
+	EACH_PARENT_MIN_LEVEL,    # Unlocks when each parent reaches minimum required level
+	ALL_MAX_LEVEL,           # Unlocks when all parents reach their maximum level
+	ANY_MAX_LEVEL,           # Unlocks when any parent reaches maximum level
+	ALL_STEPS		       # Unlocks based on steps_reached in parent nodes
 }
 
 @export var unlock_strategy := UnlockStrategy.ALL_PARENTS_TOTAL_LEVEL
@@ -89,6 +93,20 @@ func get_node_requirement_text(node_id: String) -> String:
 				levels_text += str(level) + "/" + str(node.required_parent_level) + " "
 			return levels_text.strip_edges()
 			
+		UnlockStrategy.ALL_MAX_LEVEL, UnlockStrategy.ANY_MAX_LEVEL:
+			var max_count = 0
+			for parent_id in parent_nodes:
+				if _nodes[parent_id].upgrade.is_max_level():
+					max_count += 1
+			return str(max_count) + "/" + str(parent_nodes.size() if unlock_strategy == UnlockStrategy.ALL_MAX_LEVEL else 1)
+			
+		UnlockStrategy.ALL_STEPS:
+			var steps_text = ""
+			for parent_id in parent_nodes:
+				var steps = _nodes[parent_id].steps_reached
+				steps_text += str(steps) + "/" + str(node.required_parent_level) + " "
+			return steps_text.strip_edges()	
+			
 	return ""
 
 func can_unlock_node(node_id: String) -> bool:
@@ -110,12 +128,10 @@ func can_unlock_node(node_id: String) -> bool:
 				if not _nodes[parent_id].is_unlocked():
 					return false
 				total_levels += _nodes[parent_id].get_current_level()
-			# Changed condition to check against the required level
 			return total_levels >= node.required_parent_level
 
 		UnlockStrategy.ANY_PARENT_UNLOCKED:
 			for parent_id in parent_nodes:
-				# Also check if parent meets level requirement
 				if _nodes[parent_id].is_unlocked() and _nodes[parent_id].get_current_level() >= node.required_parent_level:
 					return true
 			return false
@@ -123,6 +139,24 @@ func can_unlock_node(node_id: String) -> bool:
 		UnlockStrategy.EACH_PARENT_MIN_LEVEL:
 			for parent_id in parent_nodes:
 				if not _nodes[parent_id].is_unlocked() or _nodes[parent_id].get_current_level() < node.required_parent_level:
+					return false
+			return true
+			
+		UnlockStrategy.ALL_MAX_LEVEL:
+			for parent_id in parent_nodes:
+				if not _nodes[parent_id].upgrade.is_max_level():
+					return false
+			return true
+			
+		UnlockStrategy.ANY_MAX_LEVEL:
+			for parent_id in parent_nodes:
+				if _nodes[parent_id].upgrade.is_max_level():
+					return true
+			return false
+			
+		UnlockStrategy.ALL_STEPS:
+			for parent_id in parent_nodes:
+				if _nodes[parent_id].steps_reached < node.required_parent_level:
 					return false
 			return true
 

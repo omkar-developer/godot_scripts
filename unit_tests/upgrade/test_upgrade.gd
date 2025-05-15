@@ -310,10 +310,10 @@ func test_enable_infinite_levels():
 	
 	# Check that we don't consider max level when infinite is enabled
 	upgrade.current_level = upgrade.level_configs.size()
-	assert_false(upgrade._is_max_level(), "With infinite levels, there should be no max level")
+	assert_false(upgrade.is_max_level(), "With infinite levels, there should be no max level")
 	
 	upgrade.enable_infinite_levels = false
-	assert_true(upgrade._is_max_level(), "With infinite levels disabled, we should be at max level")
+	assert_true(upgrade.is_max_level(), "With infinite levels disabled, we should be at max level")
 
 func test_extrapolate_linear_growth():
 	# Setup linear growth pattern

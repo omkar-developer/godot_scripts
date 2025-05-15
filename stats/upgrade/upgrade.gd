@@ -280,7 +280,7 @@ func add_xp(amount: int, accumulate: bool = false) -> bool:
 	if amount <= 0:
 		printerr("UpgradeTrack: Cannot add negative or zero XP.")
 		return false
-	if _is_max_level():
+	if is_max_level():
 		if accumulate:
 			current_xp += amount
 		return false
@@ -298,7 +298,7 @@ func add_xp(amount: int, accumulate: bool = false) -> bool:
 ## Returns 0 if the track is already at the maximum level.[br]
 ## [return]: The required XP defined in the [UpgradeLevelConfig] for the current target level, or 0 if max level reached.[br]
 func get_current_xp_required() -> int:
-	if not enable_infinite_levels and _is_max_level():
+	if not enable_infinite_levels and is_max_level():
 		return 0
 		
 	var required: int
@@ -327,7 +327,7 @@ func get_progress_ratio() -> float:
 ## Internal use.[br]
 ## [return]: [code]true[/code] if the track can level up, [code]false[/code] otherwise.[br]
 func can_upgrade(added_xp: int=0) -> bool:
-	if not enable_infinite_levels and _is_max_level():
+	if not enable_infinite_levels and is_max_level():
 		return false
 
 	var config: UpgradeLevelConfig
@@ -354,7 +354,7 @@ func can_upgrade(added_xp: int=0) -> bool:
 ## Returns [code]true[/code] if the level up was successful, [code]false[/code] otherwise.[br]
 func level_up() -> bool:
 	if get_current_xp_required() == 0:
-		if _is_max_level():
+		if is_max_level():
 			return false		
 		return do_upgrade()
 	return add_xp(get_current_xp_required())
@@ -390,7 +390,7 @@ func set_level(level: int=1) -> bool:
 	if step_levels.has(current_level):
 		emit_signal("step_reached", current_level)
 
-	if not enable_infinite_levels and _is_max_level():
+	if not enable_infinite_levels and is_max_level():
 		emit_signal("max_level_reached")
 	
 	return true
@@ -441,7 +441,7 @@ func do_upgrade(ignore_cost: bool = false) -> bool:
 	if step_levels.has(current_level):
 		emit_signal("step_reached", current_level)
 
-	if not enable_infinite_levels and _is_max_level():
+	if not enable_infinite_levels and is_max_level():
 		emit_signal("max_level_reached")
 	
 	return true
@@ -459,7 +459,7 @@ func remove_current_upgrade() -> void:
 ## Checks if the current level is greater than or equal to the number of defined level configurations.[br]
 ## Internal use.[br]
 ## [return]: [code]true[/code] if the maximum level has been reached or exceeded, [code]false[/code] otherwise.[br]
-func _is_max_level() -> bool:
+func is_max_level() -> bool:
 	return not enable_infinite_levels and current_level >= level_configs.size()
 
 # --- PREVIEW SYSTEM ---
@@ -468,7 +468,7 @@ func _is_max_level() -> bool:
 ## [return]: [code]true[/code] if not at max level and the next level config ([code]level_configs[current_level][/code]) has a valid [member UpgradeLevelConfig.modifiers] set.[br]
 func has_preview() -> bool:
 	# Check bounds first
-	if not enable_infinite_levels and _is_max_level(): 
+	if not enable_infinite_levels and is_max_level(): 
 		return false
 
 	if current_level < level_configs.size():

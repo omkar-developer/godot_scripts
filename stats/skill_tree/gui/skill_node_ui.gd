@@ -10,6 +10,7 @@ signal on_focus_changed(node_ui, focused)  # New signal
 @export var skill_node: SkillTreeNode
 @export var children_nodes: Array[SkillNodeUI] = []
 @export var upgrade_on_press := true
+@export var press_action: String = "Enter"
 
 # Style customization
 @export_group("Visual Settings")
@@ -17,7 +18,6 @@ signal on_focus_changed(node_ui, focused)  # New signal
 @export var unlocked_color: Color = Color(0.7, 0.7, 0.7, 1.0)       # Node is unlocked but level 0
 @export var invested_color: Color = Color.WHITE                     # Node has points invested (level 1+)
 @export var hover_color: Color = Color(1.2, 1.2, 1.2, 1.0)          # Hover effect
-@export var selected_color: Color = Color.WHITE       				# Selection highlight
 @export var hover_scale: Vector2 = Vector2(1.1, 1.1)
 
 # Visual components visibility
@@ -37,6 +37,7 @@ signal on_focus_changed(node_ui, focused)  # New signal
 @onready var background = %Background
 @onready var lock_icon = %LockIcon if has_node("%LockIcon") else null
 @onready var selection_indicator = %Selection if has_node("%Selection") else null
+@onready var max_level_indicator = %MaxLevel if has_node("%MaxLevel") else null
 
 # State variables
 var is_hovered: bool = false
@@ -195,6 +196,10 @@ func _update_level_label() -> void:
 		# Optionally hide level when locked
 		if hide_level_when_locked:
 			level_label.visible = skill_node.is_unlocked()
+		
+		# Show max level indicator if at max level
+		if max_level_indicator:
+			max_level_indicator.visible = skill_node.is_max_level()
 
 # Highlight the node (for hover or selection)
 func _highlighted(highlight: bool = true) -> void:
@@ -221,8 +226,8 @@ func _on_mouse_exited() -> void:
 	is_hovered = false
 	_set_style()
 
-func _on_gui_input(event: InputEvent) -> void:	
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+func _on_gui_input(event: InputEvent) -> void:
+	if event.is_action_pressed(press_action):
 		# Emit signal so parent can handle selection
 		on_node_clicked.emit(self)
 
@@ -256,7 +261,7 @@ func _play_press_animation() -> void:
 	# Slightly darken on press
 	var pressed_color = icon.self_modulate.darkened(0.2)
 	press_tween.tween_property(icon, "self_modulate", pressed_color, press_animation_duration * 0.5)
-	press_tween.chain().tween_property(icon, "self_modulate", selected_color if is_selected else (hover_color if is_hovered else normal_color), press_animation_duration * 0.5)
+	press_tween.chain().tween_property(icon, "self_modulate", hover_color if is_hovered else normal_color, press_animation_duration * 0.5)
 
 func _on_focus_entered() -> void:
 	is_hovered = true
@@ -286,6 +291,10 @@ func refresh_node() -> void:
 	if skill_node:
 		refresh_node_state()
 		_update_level_label()
+		
+		 # Show max level indicator if at max level
+		if max_level_indicator:
+			max_level_indicator.visible = skill_node.is_max_level()
 		
 		# Apply current hover/selection state
 		if is_hovered or is_selected:
@@ -323,7 +332,7 @@ func _set_style(animate: bool = true) -> void:
 	
 	# Apply visual state based on selection/hover/focus
 	if is_selected:
-		target_color = selected_color
+		target_color = icon.self_modulate
 		target_scale = hover_scale if is_hovered else Vector2.ONE
 	elif is_hovered:
 		target_color = hover_color

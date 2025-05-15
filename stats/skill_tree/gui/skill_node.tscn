@@ -1,4 +1,4 @@
-[gd_scene load_steps=6 format=3 uid="uid://b1wxb2mo6pspk"]
+[gd_scene load_steps=8 format=3 uid="uid://b1wxb2mo6pspk"]
 
 [ext_resource type="Script" uid="uid://b7n66d4qnlf8i" path="res://scripts/stats/skill_tree/gui/skill_node_ui.gd" id="1_nohl5"]
 [ext_resource type="Texture2D" uid="uid://c1xgwn2chet6s" path="res://icon.svg" id="2_xj6q7"]
@@ -36,6 +36,31 @@ expand_margin_left = 3.0
 expand_margin_top = 3.0
 expand_margin_right = 3.0
 expand_margin_bottom = 3.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_xj6q7"]
+draw_center = false
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.591368, 0.168688, 0, 1)
+border_blend = true
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+expand_margin_left = 4.0
+expand_margin_top = 4.0
+expand_margin_right = 4.0
+expand_margin_bottom = 4.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_81x47"]
+content_margin_left = 3.0
+content_margin_top = 1.0
+content_margin_right = 2.0
+content_margin_bottom = 3.0
+bg_color = Color(1, 0.086748, 0.0836371, 0.475)
+corner_radius_top_left = 10
 
 [node name="SkillNode" type="Control"]
 custom_minimum_size = Vector2(64, 64)
@@ -110,6 +135,34 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_nohl5")
+
+[node name="MaxLevel" type="Panel" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_xj6q7")
+
+[node name="max_label" type="Label" parent="MaxLevel"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -38.0
+offset_top = -27.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_styles/normal = SubResource("StyleBoxFlat_81x47")
+text = "Max"
+horizontal_alignment = 2
+vertical_alignment = 1
 
 [connection signal="focus_entered" from="." to="." method="_on_focus_entered"]
 [connection signal="focus_exited" from="." to="." method="_on_focus_exited"]

@@ -16,6 +16,8 @@ signal on_unlocked
 @export var required_parent_level: int = 1 
 
 # --- Runtime State ---
+var steps_reached := 0
+
 var unlocked: bool = false :
 	set(value):
 		unlocked = value
@@ -35,10 +37,14 @@ func init_node(stat_owner: Object, inventory: Object = null, _skill_tree: SkillT
 	self.skill_tree = _skill_tree
 	if upgrade:
 		upgrade.init_upgrade(stat_owner, inventory)
+		upgrade.step_reached.connect(_step_reached)
 		if auto_upgrade_to_level_1 and upgrade.get_current_level() == 0:
 			upgrade_level(true)
 	else:
 		printerr("SkillTreeNode : Upgrade resource not set!")
+
+func _step_reached(_step_level: int) -> void:
+	steps_reached += 1
 
 # Check if the node is currently unlocked.
 func is_unlocked() -> bool:
@@ -71,6 +77,11 @@ func get_current_level() -> int:
 	if upgrade:
 		return upgrade.get_current_level()
 	return 0
+
+func is_max_level() -> bool:
+	if upgrade:
+		return upgrade.is_max_level()
+	return false
 
 # Reset the node's state to its initial values (called by SkillTree reset).
 func reset_node_internal():
