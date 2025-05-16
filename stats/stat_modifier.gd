@@ -170,6 +170,8 @@ func get_temp_applied_stat() -> Stat:
 
 ## Simulates the effect of applying this modifier without changing the actual stat.
 ## [return]: A dictionary containing:
+##           - "old_value": The predicted change in the stat's min value.
+##           - "old_max": The predicted change in the stat's max value.
 ##           - "value_diff": The predicted change in the stat's value.
 ##           - "max_diff": The predicted change in the stat's max value.
 func simulate_effect() -> Dictionary:

@@ -1,66 +1,54 @@
-[gd_scene load_steps=8 format=3 uid="uid://dkd18f5dfhwfp"]
+[gd_scene load_steps=6 format=3 uid="uid://dkd18f5dfhwfp"]
 
-[ext_resource type="Texture2D" uid="uid://k46xthn0lfb" path="res://test_assets/64x64Materials.png" id="1_sved3"]
 [ext_resource type="Script" uid="uid://crsydlcklwld3" path="res://scripts/stats/skill_tree/gui/material_view.gd" id="1_wbe6y"]
 [ext_resource type="Texture2D" uid="uid://bxy54yhoakj8y" path="res://test_assets/icons.tres" id="2_r0x1s"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_sved3"]
 bg_color = Color(0.169245, 0.169245, 0.169245, 1)
+border_width_left = 4
 border_width_top = 4
+border_width_right = 4
 border_width_bottom = 4
-border_color = Color(0.903258, 0.546583, 7.70092e-07, 1)
+border_color = Color(0, 0, 0, 1)
 border_blend = true
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_wbe6y"]
-atlas = ExtResource("1_sved3")
-region = Rect2(268, 834, 43, 59)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_wbe6y"]
 draw_center = false
-border_width_left = 1
 border_width_top = 1
-border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.748552, 0.393124, 0.0969863, 1)
+border_color = Color(2.59906e-06, 0.555494, 0.693276, 1)
 corner_radius_top_left = 2
 corner_radius_top_right = 2
 corner_radius_bottom_right = 2
 corner_radius_bottom_left = 2
 
 [sub_resource type="LabelSettings" id="LabelSettings_wbe6y"]
-font_size = 18
+font_size = 14
 
 [node name="MaterialView" type="PanelContainer"]
-offset_right = 72.0
-offset_bottom = 110.0
+offset_right = 48.0
+offset_bottom = 69.0
+size_flags_vertical = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_sved3")
 script = ExtResource("1_wbe6y")
 material_icon = ExtResource("2_r0x1s")
-material_amount = 3
 
-[node name="MarginContainer" type="MarginContainer" parent="."]
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
 layout_mode = 2
-theme_override_constants/margin_left = 4
-theme_override_constants/margin_top = 4
-theme_override_constants/margin_right = 4
-theme_override_constants/margin_bottom = 4
+size_flags_vertical = 0
 
-[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer"]
-layout_mode = 2
-
-[node name="Texture" type="TextureRect" parent="MarginContainer/VBoxContainer"]
+[node name="Texture" type="TextureRect" parent="VBoxContainer"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(64, 64)
+custom_minimum_size = Vector2(32, 32)
 layout_mode = 2
 size_flags_horizontal = 4
 size_flags_vertical = 0
-texture = SubResource("AtlasTexture_wbe6y")
+texture = ExtResource("2_r0x1s")
 expand_mode = 2
 
-[node name="Label" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="Label" type="Label" parent="VBoxContainer"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_styles/normal = SubResource("StyleBoxFlat_wbe6y")
-text = "2/10"
 label_settings = SubResource("LabelSettings_wbe6y")
 horizontal_alignment = 1

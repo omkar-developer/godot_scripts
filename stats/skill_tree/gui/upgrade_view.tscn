@@ -1,25 +1,96 @@
-[gd_scene load_steps=2 format=3 uid="uid://chmgwahvmubsw"]
+[gd_scene load_steps=6 format=3 uid="uid://chmgwahvmubsw"]
+
+[ext_resource type="Texture2D" uid="uid://cscask4c054f7" path="res://test_assets/Free 50 Aeromancer Skills/PNG/40.png" id="1_bslq7"]
+[ext_resource type="Script" uid="uid://bblgqyqowan4e" path="res://scripts/stats/skill_tree/gui/upgrade_view.gd" id="1_li3o8"]
+[ext_resource type="Texture2D" uid="uid://k46xthn0lfb" path="res://test_assets/64x64Materials.png" id="4_7wrmw"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_rl5ji"]
 font_size = 26
 
+[sub_resource type="AtlasTexture" id="AtlasTexture_coieq"]
+atlas = ExtResource("4_7wrmw")
+region = Rect2(328, 966, 44, 58)
+
 [node name="UpgradeView" type="PanelContainer"]
 custom_minimum_size = Vector2(300, 0)
-anchors_preset = 9
+anchors_preset = 11
+anchor_left = 1.0
+anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = -210.0
+grow_horizontal = 0
 grow_vertical = 2
+script = ExtResource("1_li3o8")
 
-[node name="VBoxContainer" type="VBoxContainer" parent="."]
+[node name="CenterContainer" type="MarginContainer" parent="."]
 layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
 
-[node name="MarginContainer" type="MarginContainer" parent="VBoxContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer"]
 layout_mode = 2
-theme_override_constants/margin_top = 6
-theme_override_constants/margin_bottom = 6
+theme_override_constants/separation = 12
 
-[node name="Title" type="Label" parent="VBoxContainer/MarginContainer"]
+[node name="Icon" type="TextureRect" parent="CenterContainer/VBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+size_flags_horizontal = 4
+texture = ExtResource("1_bslq7")
+expand_mode = 2
+
+[node name="Title" type="Label" parent="CenterContainer/VBoxContainer"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Title"
+text = "Enduring Spirit"
 label_settings = SubResource("LabelSettings_rl5ji")
 horizontal_alignment = 1
+
+[node name="Description" type="RichTextLabel" parent="CenterContainer/VBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 92)
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 18
+bbcode_enabled = true
+text = "[b]Description:[/b] Harnesses spiritual energy to sustain physical form."
+
+[node name="Changes" type="VBoxContainer" parent="CenterContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Materials" type="HBoxContainer" parent="CenterContainer/VBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 64)
+layout_mode = 2
+theme_override_constants/separation = 4
+alignment = 1
+
+[node name="HBoxContainer" type="HBoxContainer" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+alignment = 1
+
+[node name="CostLabel" type="Label" parent="CenterContainer/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+text = "Required:"
+
+[node name="CostIcon" type="TextureRect" parent="CenterContainer/VBoxContainer/HBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+texture = SubResource("AtlasTexture_coieq")
+expand_mode = 2
+
+[node name="Cost" type="Label" parent="CenterContainer/VBoxContainer/HBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "23000"
+
+[node name="Button" type="Button" parent="CenterContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 64)
+layout_mode = 2
+text = "Upgrade"
+
+[connection signal="pressed" from="CenterContainer/VBoxContainer/Button" to="." method="_on_button_pressed"]

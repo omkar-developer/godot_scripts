@@ -487,6 +487,8 @@ func reset_modifiers() -> void:
 ## Returns the difference between the current stat and another stat.
 ## [param other_stat]: The stat to compare with.
 ## [return]: A dictionary containing:
+##           - "old_value": The current value of the stat.
+##           - "old_max": The current maximum value of the stat.
 ##           - "value_diff": The difference in the stat's value.
 ##           - "max_diff": The difference in the stat's max value.
 func get_difference_from(other_stat: Stat) -> Dictionary:
@@ -498,6 +500,8 @@ func get_difference_from(other_stat: Stat) -> Dictionary:
 	var max_diff = other_stat.get_max() - self.get_max()
 
 	return {
+		"old_value": get_value(),
+		"old_max": get_max(),
 		"value_diff": value_diff,
 		"max_diff": max_diff
 	}

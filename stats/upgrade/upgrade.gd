@@ -499,7 +499,7 @@ func get_preview_modifier_set() -> StatModifierSet:
 	if current_level >= level_configs.size():
 		if not enable_infinite_levels:
 			return null
-		config = _generate_extrapolated_config(current_level + 1)
+		config = _generate_extrapolated_config(current_level)
 		return config.modifiers if config else null
 	else:
 		return level_configs[current_level].modifiers
@@ -574,6 +574,18 @@ func do_refund() -> int:
 		refund_data.materials
 	)
 	return refund_data.xp
+
+## Returns the [UpgradeLevelConfig] for the current level (if any) or null.
+func get_current_level_config() -> UpgradeLevelConfig:
+	var config: UpgradeLevelConfig
+	
+	if current_level >= level_configs.size():
+		if not enable_infinite_levels:
+			return null
+		config = _generate_extrapolated_config(current_level + 1)
+	else:
+		config = level_configs[current_level]
+	return config
 
 ## Resets the upgrade to its initial state (level 0, 0 XP).[br]
 ## Removes any currently applied modifiers.[br]

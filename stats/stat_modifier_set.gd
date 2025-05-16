@@ -340,3 +340,29 @@ func _instantiate_class(class_type: String) -> Object:
 	else:
 		push_warning("Unknown class type: %s, defaulting to null." % class_type)
 		return null
+
+## Gets a temporary version of the stats with all modifiers in this set applied.
+## [return]: Dictionary of stat names to their temporary Stat objects.
+func get_temp_applied_stats() -> Dictionary:
+	var temp_stats := {}
+	for mod in _modifiers:
+		var stat_name = mod.get_stat_name()
+		if not temp_stats.has(stat_name):
+			if not mod.is_valid(): continue
+			temp_stats[stat_name] = mod._stat.duplicate(true)
+		mod._apply_stat_modifier(mod.get_type(), temp_stats[stat_name], mod.get_value())
+	return temp_stats
+
+## Simulates the effect of applying all modifiers in this set without changing the actual stats.
+## [return]: Dictionary mapping stat names to their predicted changes:
+##          { stat_name: { "old_value": float, "old_max": float, "value_diff": float, "max_diff": float } }
+func simulate_effect() -> Dictionary:
+	var result := {}
+	var temp_stats = get_temp_applied_stats()
+	
+	for stat_name in temp_stats:
+		var orig_stat = _parent.get_stat(stat_name)
+		if orig_stat:
+			result[stat_name] = orig_stat.get_difference_from(temp_stats[stat_name])
+	
+	return result
