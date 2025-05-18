@@ -59,39 +59,64 @@ func update_data():
 #   "change": <change_string>       # Optional: String representing change (e.g., "+5" or "-3"). Can be empty string.
 # }
 func set_data(data: Dictionary, changes_data:Dictionary = {}, materials_data:Dictionary = {}, material_icons:Dictionary = {}, inventory_data:Dictionary = {}):
+	# Safely get base upgrade data
 	upgrade_icon = data.get("icon", null)
 	upgrade_name = data.get("name", "")
 	upgrade_description = data.get("description", "")
 	
+	# Handle stat changes
 	if changes_data:
 		var changes = []
 		for change in changes_data:
+			# Safely get material icons dictionary
+			var icon = null
+			if material_icons.has(change):
+				icon = material_icons[change].get("icon", null)
+				
+			# Safely get change values with defaults
+			var change_dict = changes_data.get(change, {})
+			var old_value = change_dict.get("old_value", 0.0)
+			var value_diff = change_dict.get("value_diff", 0.0)
+			
 			var change_data = {
 				"name": change,
-				"icon": material_icons[change].get("icon", null),             
-				"value": changes_data[change].get("old_value", 0.0),
-				"change": changes_data[change].get("old_value", 0.0) + changes_data[change].get("value_diff", 0.0)
+				"icon": icon,
+				"value": old_value,
+				"change": old_value + value_diff
 			}
 			changes.append(change_data)
-		stat_changes = changes
+		stat_changes.assign(changes)
 	else:
-		stat_changes = data.get("stat_changes", [])
+		stat_changes.assign(data.get("stat_changes", []))
 	
+	# Handle materials
 	if materials_data:
 		var materials = []
 		for mat in materials_data:
+			# Safely get material icons
+			var icon = null
+			if material_icons.has(mat):
+				icon = material_icons[mat].get("icon", null)
+			
+			# Safely get inventory and material amounts
+			var inv_amount = 0
+			if inventory_data.has(mat):
+				inv_amount = inventory_data[mat].get("amount", 0)
+			
+			var req_amount = 0
+			if materials_data.has(mat):
+				req_amount = materials_data[mat].get("amount", 0)
+			
 			var material_data = {
 				"name": mat,
-				"icon": material_icons[mat].get("icon", null),
-				"amount": str(inventory_data[mat].get("amount", 0)) + "/" + str(materials_data[mat].get("amount", 0))
+				"icon": icon,
+				"amount": str(inv_amount) + "/" + str(req_amount)
 			}
 			materials.append(material_data)
 		required_materials = materials
 	else:
-		required_materials = data.get("required_materials", [])
+		required_materials.assign(data.get("required_materials", []))
 
-	stat_changes = data.get("stat_changes", [])
-	required_materials = data.get("required_materials", [])
 	upgrade_cost = data.get("upgrade_cost", 0)
 	upgrade_cost_icon = data.get("upgrade_cost_icon", null)
 	update_data()

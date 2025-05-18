@@ -12,6 +12,10 @@ signal on_focus_changed(node_ui, focused)  # New signal
 @export var upgrade_on_press := true
 @export var press_action: String = "Enter"
 
+@export_group("Information")
+@export var skill_title := ""
+@export var skill_description := ""
+@export var skill_icon: Texture2D
 # Style customization
 @export_group("Visual Settings")
 @export var locked_color: Color = Color(0.39, 0.39, 0.39, 1.0)      # Node is locked

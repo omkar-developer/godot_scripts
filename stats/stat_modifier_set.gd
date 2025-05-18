@@ -142,7 +142,8 @@ func _remove_effect() -> void:
 
 ## Initializes all _modifiers in this set with the given _parent.[br]
 ## [param _parent]: The _parent to initialize the _modifiers with.
-func init_modifiers(parent: Object) -> void:
+## [param apply_effect]: Whether to apply the effects of the _modifiers.
+func init_modifiers(parent: Object, apply_effect := true) -> void:
 	if _parent != null: 
 		push_error("Attempted to set new parent while already initialized without uninitializing first.")
 		return
@@ -155,12 +156,12 @@ func init_modifiers(parent: Object) -> void:
 	if condition != null:
 		condition.init_stat(parent)
 		_connect_condition()
-		if _condition_apply_on_start:
+		if _condition_apply_on_start and apply_effect:
 			_apply_effect()
 			if _condition_pause_process: process = condition.get_condition()
 
 	# Apply effects
-	if (_apply or consumable) and condition == null:
+	if ((_apply and apply_effect) or consumable) and condition == null:
 		_apply_effect()
 	
 	if consumable:
@@ -345,14 +346,29 @@ func _instantiate_class(class_type: String) -> Object:
 ## [return]: Dictionary of stat names to their temporary Stat objects.
 func get_temp_applied_stats() -> Dictionary:
 	var temp_stats := {}
+	
+	# First pass - initialize temp stats from valid modifiers
 	for mod in _modifiers:
 		var stat_name = mod.get_stat_name()
-		if not temp_stats.has(stat_name):
-			if not mod.is_valid(): continue
-			temp_stats[stat_name] = mod._stat.duplicate(true)
-		mod._apply_stat_modifier(mod.get_type(), temp_stats[stat_name], mod.get_value())
-	return temp_stats
 
+		if not mod.is_valid():
+			if not temp_stats.has(stat_name):
+				temp_stats[stat_name] = Stat.new()
+			continue			
+		
+		# Only create new temp stat if we haven't seen this stat name yet
+		if not temp_stats.has(stat_name):
+			if _parent != null and mod._stat != null:
+				temp_stats[stat_name] = mod._stat.duplicate(true)
+	
+	# Second pass - apply all modifiers to their respective stats
+	for mod in _modifiers:	
+		var stat_name = mod.get_stat_name()
+		# Apply modifier to the temp stat
+		mod._apply_stat_modifier(mod.get_type(), temp_stats[stat_name], mod.get_value())
+	
+	return temp_stats
+	
 ## Simulates the effect of applying all modifiers in this set without changing the actual stats.
 ## [return]: Dictionary mapping stat names to their predicted changes:
 ##          { stat_name: { "old_value": float, "old_max": float, "value_diff": float, "max_diff": float } }

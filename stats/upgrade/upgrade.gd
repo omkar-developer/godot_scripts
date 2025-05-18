@@ -494,15 +494,19 @@ func get_preview_modifier_set() -> StatModifierSet:
 	if not has_preview():
 		printerr("UpgradeTrack: get_preview_modifier_set called when no preview is available.")
 		return null
+	
+	var modifer_set: StatModifierSet
 		
 	var config: UpgradeLevelConfig
 	if current_level >= level_configs.size():
 		if not enable_infinite_levels:
 			return null
 		config = _generate_extrapolated_config(current_level)
-		return config.modifiers if config else null
+		modifer_set = config.modifiers if config else null
 	else:
-		return level_configs[current_level].modifiers
+		modifer_set = level_configs[current_level].modifiers
+	modifer_set.init_modifiers(_stat_owner, false)
+	return modifer_set
 
 ## Simulates the effect of the next upgrade's modifiers without applying them permanently.[br]
 ## Useful for displaying potential stat changes in UI.[br]

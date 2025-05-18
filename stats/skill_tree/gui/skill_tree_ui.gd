@@ -2,13 +2,15 @@ class_name SkillTreeUI
 extends Control
 
 # Emitted when a node is clicked
-signal node_clicked(node_ui)
+signal node_clicked(node_ui:SkillNodeUI)
 # Emitted when a node is unlocked
 signal node_unlocked(node_id)
 # Emitted when a node is upgraded
 signal node_upgraded(node_id, new_level)
 # Emitted when connections are created
 signal connections_created
+# Emitted when a node is selected
+signal node_selected(node_ui:SkillNodeUI)
 
 # Path to the skill connection scene
 @export var skill_connection_scene: PackedScene
@@ -70,6 +72,13 @@ func initialize_skill_tree(tree: SkillTree) -> void:
 	# Refresh UI state
 	refresh_all()
 
+# Connect the node UI signals
+func _connect_node_ui_signals(node_ui: SkillNodeUI) -> void:
+	node_ui.on_focus_changed.connect(_on_node_ui_focus_changed)
+	node_ui.on_node_clicked.connect(_on_node_ui_clicked)
+	node_ui.on_unlocked.connect(_on_node_ui_unlocked)
+	node_ui.on_upgrade.connect(_on_node_ui_upgraded)
+
 # Find all SkillNodeUI children in the scene
 func _find_skill_node_ui_children() -> void:
 	node_ui_elements.clear()
@@ -90,9 +99,7 @@ func _find_skill_node_ui_recursive(node: Node) -> void:
 			
 				node_ui_elements[node_ui.node_id] = node_ui
 				# Connect the node UI signals
-				node_ui.on_node_clicked.connect(_on_node_ui_clicked)
-				node_ui.on_unlocked.connect(_on_node_ui_unlocked)
-				node_ui.on_upgrade.connect(_on_node_ui_upgraded)
+				_connect_node_ui_signals(node_ui)
 		
 		# Recursively check children
 		if child.get_child_count() > 0:
@@ -276,9 +283,14 @@ func _update_connection_states(node_id := "") -> void:
 
 # SIGNAL HANDLERS
 
-# Node UI was clicked
+# Node UI was clicked - now just handles the click event, selection is handled by focus
 func _on_node_ui_clicked(node_ui: SkillNodeUI) -> void:
 	emit_signal("node_clicked", node_ui)
+
+# Node UI focus changed
+func _on_node_ui_focus_changed(node_ui: SkillNodeUI, focused: bool) -> void:
+	if focused:
+		emit_signal("node_selected", node_ui)
 
 # Node UI was unlocked
 func _on_node_ui_unlocked(_node_ui: SkillNodeUI) -> void:
@@ -311,6 +323,9 @@ func _on_skill_tree_node_upgraded(node_id: String, new_level: int) -> void:
 func _on_skill_points_changed(_new_amount: int) -> void:
 	# Refresh all nodes to update their appearance based on whether they can be upgraded
 	refresh_all()
+
+func get_skill_node(node_id: String) -> SkillNodeUI:
+	return node_ui_elements[node_id]
 
 # Try to upgrade a node
 func try_upgrade_node(node_id: String) -> bool:
