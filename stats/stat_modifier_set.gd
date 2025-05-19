@@ -29,6 +29,16 @@ signal on_effect_remove # Signal emitted when an effect is removed from a stat.
 ## remove as soon as applied (effect will not be removed)
 @export var consumable := false
 
+@export_group("Signal")
+@export var apply_on_signal := false
+@export var remove_on_signal := false
+@export var pause_on_apply_signal := false
+@export var resume_on_apply_signal := false
+@export var pause_on_remove_signal := false
+@export var resume_on_remove_signal := false
+@export var apply_signal := ""
+@export var remove_signal := ""
+
 @export_group("Condition")
 ## The condition associated with this modifier set.
 @export var condition: Condition
@@ -50,10 +60,49 @@ var _parent: Object
 func get_modifier_name() -> String:
 	return _modifier_name
 
+## Initialize a new modifier set.
 func _init(modifier_name := "", _process_every_frame := false, group := "") -> void:
 	_modifier_name = modifier_name
 	_group = group
 	process = _process_every_frame
+
+## Called when the apply signal is emitted
+func _on_apply_signal() -> void:
+	if apply_on_signal: _apply_effect()
+	if pause_on_apply_signal: process = false
+	if resume_on_apply_signal: process = true
+
+## Called when the remove signal is emitted
+func _on_remove_signal() -> void:
+	if remove_on_signal: _remove_effect()
+	if pause_on_remove_signal: process = false
+	if resume_on_remove_signal: process = true
+
+## Connects signals
+func _connect_signals() -> void:
+	if apply_signal.is_empty() and remove_signal.is_empty(): return
+	if _parent != null and _parent.has_method("get_signal"):
+		var sig = _parent.get_signal(apply_signal)
+		if sig != null and not sig.is_connected(_on_apply_signal):
+			sig.connect(_on_apply_signal)
+		else:
+			push_error("Failed to connect signal: " + apply_signal)
+		sig = _parent.get_signal(remove_signal)
+		if sig != null and not sig.is_connected(_on_remove_signal):
+			sig.connect(_on_remove_signal)
+		else:
+			push_error("Failed to connect signal: " + remove_signal)
+
+## Disconnects signals
+func _disconnect_signals() -> void:
+	if apply_signal.is_empty() and remove_signal.is_empty(): return
+	if _parent != null and _parent.has_method("get_signal"):
+		var sig = _parent.get_signal(apply_signal)
+		if sig != null and sig.is_connected(_on_apply_signal):
+			sig.disconnect(_on_apply_signal)
+		sig = _parent.get_signal(remove_signal)
+		if sig != null and sig.is_connected(_on_remove_signal):
+			sig.disconnect(_on_remove_signal)		
 
 ## Called when the condition state changes
 func _on_condition_changed(result: bool) -> void:
@@ -159,6 +208,9 @@ func init_modifiers(parent: Object, apply_effect := true) -> void:
 		if _condition_apply_on_start and apply_effect:
 			_apply_effect()
 			if _condition_pause_process: process = condition.get_condition()
+	
+	# initialize signals
+	_connect_signals()
 
 	# Apply effects
 	if ((_apply and apply_effect) or consumable) and condition == null:
@@ -169,6 +221,7 @@ func init_modifiers(parent: Object, apply_effect := true) -> void:
 
 ## Uninitializes all _modifiers in this set.
 func uninit_modifiers() -> void:
+	_disconnect_signals()
 	if condition != null:
 		_disconnect_condition()
 		condition.uninit_stat()
@@ -213,9 +266,10 @@ func clear_modifiers() -> void:
 		mod.uninit_stat(_remove_all)
 	_modifiers.clear()
 
-## Clears all _modifiers in this set and uninitializes the condition.
+## Clears all _modifiers in this set and uninitializes the condition and disconnects signals.
 func clear_all() -> void:
 	clear_modifiers()
+	_disconnect_signals()
 	if condition != null:
 		condition.uninit_stat()
 		_disconnect_condition()
@@ -228,6 +282,7 @@ func _process(delta: float) -> void:
 ## Deletes this modifier set.
 func delete() -> void:
 	process = false
+	_disconnect_signals()
 	if condition != null:
 		_disconnect_condition()
 		condition.uninit_stat()
@@ -253,6 +308,17 @@ func copy() -> StatModifierSet:
 	mod_set._condition_pause_process = _condition_pause_process
 	mod_set.apply_on_condition_change = apply_on_condition_change
 	mod_set.remove_on_condition_change = remove_on_condition_change
+	mod_set.consumable = consumable
+	mod_set.apply_on_signal = apply_on_signal
+	mod_set.remove_on_signal = remove_on_signal
+	mod_set.apply_signal = apply_signal
+	mod_set.remove_signal = remove_signal
+	mod_set._apply = _apply
+	mod_set.pause_on_apply_signal = pause_on_apply_signal
+	mod_set.pause_on_remove_signal = pause_on_remove_signal
+	mod_set.resume_on_apply_signal = resume_on_apply_signal
+	mod_set.resume_on_remove_signal = resume_on_remove_signal
+	
 	return mod_set
 
 ## Interpolates this modifier set with another modifier set.[br]
@@ -283,7 +349,15 @@ func to_dict() -> Dictionary:
 		"apply_on_condition_change": apply_on_condition_change,
 		"remove_on_condition_change": remove_on_condition_change,
 		"apply": _apply,
-		"consumable": consumable
+		"consumable": consumable,
+		"apply_on_signal": apply_on_signal,
+		"remove_on_signal": remove_on_signal,
+		"apply_signal": apply_signal,
+		"remove_signal": remove_signal,
+		"pause_on_apply_signal": pause_on_apply_signal,
+		"pause_on_remove_signal": pause_on_remove_signal,
+		"resume_on_apply_signal": resume_on_apply_signal,
+		"resume_on_remove_signal": resume_on_remove_signal
 	}
 
 ## Loads this modifier set from a dictionary.
@@ -315,6 +389,16 @@ func from_dict(data: Dictionary, parent: Object = null) -> void:
 	remove_on_condition_change = data.get("remove_on_condition_change", true)
 	_apply = data.get("apply", true)
 	consumable = data.get("consumable", false)
+	apply_on_signal = data.get("apply_on_signal", false)
+	remove_on_signal = data.get("remove_on_signal", false)
+	apply_signal = data.get("apply_signal", "")
+	remove_signal = data.get("remove_signal", "")
+	pause_on_apply_signal = data.get("pause_on_apply_signal", false)
+	pause_on_remove_signal = data.get("pause_on_remove_signal", false)
+	resume_on_apply_signal = data.get("resume_on_apply_signal", false)
+	resume_on_remove_signal = data.get("resume_on_remove_signal", false)
+
+	_connect_signals()
 
 	if data.has("condition_class") and data["condition_class"] != "":
 		condition = _instantiate_class(data["condition_class"])
@@ -341,6 +425,14 @@ func _instantiate_class(class_type: String) -> Object:
 	else:
 		push_warning("Unknown class type: %s, defaulting to null." % class_type)
 		return null
+
+## Gets the names of all stats affected by this modifier set.
+## [return]: Dictionary of stat names to their Stat objects.
+func get_affected_stats() -> Dictionary:
+	var stats = {}
+	for mod in _modifiers:
+		stats[mod.get_stat_name()] = mod._stat
+	return stats
 
 ## Gets a temporary version of the stats with all modifiers in this set applied.
 ## [return]: Dictionary of stat names to their temporary Stat objects.

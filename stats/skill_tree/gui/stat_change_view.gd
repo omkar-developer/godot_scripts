@@ -5,7 +5,7 @@ extends Control
 	set(v):
 		stat_name = v
 		if %Name: 
-			if stat_name.is_empty():
+			if not stat_name.is_empty():
 				%Name.visible = true
 				%Name.text = stat_name
 			else:

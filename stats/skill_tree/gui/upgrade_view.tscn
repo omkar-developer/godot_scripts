@@ -1,11 +1,8 @@
-[gd_scene load_steps=6 format=3 uid="uid://chmgwahvmubsw"]
+[gd_scene load_steps=5 format=3 uid="uid://chmgwahvmubsw"]
 
 [ext_resource type="Texture2D" uid="uid://cscask4c054f7" path="res://test_assets/Free 50 Aeromancer Skills/PNG/40.png" id="1_bslq7"]
 [ext_resource type="Script" uid="uid://bblgqyqowan4e" path="res://scripts/stats/skill_tree/gui/upgrade_view.gd" id="1_li3o8"]
 [ext_resource type="Texture2D" uid="uid://k46xthn0lfb" path="res://test_assets/64x64Materials.png" id="4_7wrmw"]
-
-[sub_resource type="LabelSettings" id="LabelSettings_rl5ji"]
-font_size = 26
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_coieq"]
 atlas = ExtResource("4_7wrmw")
@@ -41,20 +38,27 @@ size_flags_horizontal = 4
 texture = ExtResource("1_bslq7")
 expand_mode = 2
 
-[node name="Title" type="Label" parent="CenterContainer/VBoxContainer"]
+[node name="Title" type="RichTextLabel" parent="CenterContainer/VBoxContainer"]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_font_sizes/bold_italics_font_size = 24
+theme_override_font_sizes/italics_font_size = 21
+theme_override_font_sizes/mono_font_size = 21
+theme_override_font_sizes/normal_font_size = 21
+theme_override_font_sizes/bold_font_size = 24
+bbcode_enabled = true
 text = "Enduring Spirit"
-label_settings = SubResource("LabelSettings_rl5ji")
+fit_content = true
 horizontal_alignment = 1
 
 [node name="Description" type="RichTextLabel" parent="CenterContainer/VBoxContainer"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 92)
 layout_mode = 2
+size_flags_vertical = 0
 theme_override_font_sizes/normal_font_size = 18
 bbcode_enabled = true
-text = "[b]Description:[/b] Harnesses spiritual energy to sustain physical form."
+text = "[b]Description:[/b] Harnesses spiritual"
+fit_content = true
 
 [node name="Changes" type="VBoxContainer" parent="CenterContainer/VBoxContainer"]
 unique_name_in_owner = true
@@ -68,29 +72,31 @@ layout_mode = 2
 theme_override_constants/separation = 4
 alignment = 1
 
-[node name="HBoxContainer" type="HBoxContainer" parent="CenterContainer/VBoxContainer"]
+[node name="CostContainer" type="HBoxContainer" parent="CenterContainer/VBoxContainer"]
+unique_name_in_owner = true
 layout_mode = 2
 alignment = 1
 
-[node name="CostLabel" type="Label" parent="CenterContainer/VBoxContainer/HBoxContainer"]
+[node name="CostLabel" type="Label" parent="CenterContainer/VBoxContainer/CostContainer"]
 layout_mode = 2
 text = "Required:"
 
-[node name="CostIcon" type="TextureRect" parent="CenterContainer/VBoxContainer/HBoxContainer"]
+[node name="CostIcon" type="TextureRect" parent="CenterContainer/VBoxContainer/CostContainer"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(16, 16)
 layout_mode = 2
 texture = SubResource("AtlasTexture_coieq")
 expand_mode = 2
 
-[node name="Cost" type="Label" parent="CenterContainer/VBoxContainer/HBoxContainer"]
+[node name="Cost" type="Label" parent="CenterContainer/VBoxContainer/CostContainer"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "23000"
 
-[node name="Button" type="Button" parent="CenterContainer/VBoxContainer"]
+[node name="UpgradeBtn" type="Button" parent="CenterContainer/VBoxContainer"]
+unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 64)
 layout_mode = 2
 text = "Upgrade"
 
-[connection signal="pressed" from="CenterContainer/VBoxContainer/Button" to="." method="_on_button_pressed"]
+[connection signal="pressed" from="CenterContainer/VBoxContainer/UpgradeBtn" to="." method="_on_button_pressed"]

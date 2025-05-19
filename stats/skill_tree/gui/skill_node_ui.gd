@@ -14,7 +14,7 @@ signal on_focus_changed(node_ui, focused)  # New signal
 
 @export_group("Information")
 @export var skill_title := ""
-@export var skill_description := ""
+@export_multiline var skill_description := ""
 @export var skill_icon: Texture2D
 # Style customization
 @export_group("Visual Settings")

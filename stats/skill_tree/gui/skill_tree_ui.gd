@@ -4,9 +4,9 @@ extends Control
 # Emitted when a node is clicked
 signal node_clicked(node_ui:SkillNodeUI)
 # Emitted when a node is unlocked
-signal node_unlocked(node_id)
+signal node_unlocked(node_ui:SkillNodeUI)
 # Emitted when a node is upgraded
-signal node_upgraded(node_id, new_level)
+signal node_upgraded(node_ui:SkillNodeUI, new_level)
 # Emitted when connections are created
 signal connections_created
 # Emitted when a node is selected
@@ -306,18 +306,15 @@ func _on_node_ui_upgraded(_node_ui: SkillNodeUI, _level: int) -> void:
 func _on_skill_tree_node_unlocked(node_id: String) -> void:
 	if node_ui_elements.has(node_id):
 		node_ui_elements[node_id].refresh_node()
-	
-	# Update connections
-	_update_connection_states()
-	
-	emit_signal("node_unlocked", node_id)
+		_update_connection_states()		
+		emit_signal("node_unlocked", node_ui_elements[node_id])
 
 # Skill tree node was upgraded
 func _on_skill_tree_node_upgraded(node_id: String, new_level: int) -> void:
 	if node_ui_elements.has(node_id):
 		node_ui_elements[node_id].refresh_node()
-	_update_connection_states(node_id)	
-	emit_signal("node_upgraded", node_id, new_level)
+		_update_connection_states(node_id)	
+		emit_signal("node_upgraded", node_ui_elements[node_id], new_level)
 
 # Skill points changed
 func _on_skill_points_changed(_new_amount: int) -> void:

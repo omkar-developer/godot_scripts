@@ -504,29 +504,57 @@ func get_preview_modifier_set() -> StatModifierSet:
 		config = _generate_extrapolated_config(current_level)
 		modifer_set = config.modifiers if config else null
 	else:
-		modifer_set = level_configs[current_level].modifiers
+		modifer_set = level_configs[current_level].modifiers.copy()
 	modifer_set.init_modifiers(_stat_owner, false)
 	return modifer_set
 
 ## Simulates the effect of the next upgrade's modifiers without applying them permanently.[br]
-## Useful for displaying potential stat changes in UI.[br]
-## Requires the [StatModifierSet] class to have a [code]simulate_effect()[/code] method implemented.[br]
-## [return]: A [Dictionary] representing the simulated stat changes (structure depends on [StatModifierSet] implementation). Returns empty [Dictionary] ([code]{}[/code]) if no preview is available or method is missing.[br]
+## Returns a Dictionary with the differences between current and simulated values.[br]
+## [return]: A Dictionary in format { stat_name: { "old_value": float, "old_max": float, "value_diff": float, "max_diff": float } }[br]
 func simulate_next_effect() -> Dictionary:
 	var preview_mod_set = get_preview_modifier_set()
-	if preview_mod_set and preview_mod_set.has_method("simulate_effect"):
-		return preview_mod_set.simulate_effect()
-	return {}
+	if not preview_mod_set or not preview_mod_set.has_method("simulate_effect"):
+		return {}
 
-## Gets temporarily applied stats from the next upgrade's modifiers for preview purposes.[br]
-## Useful for previewing effects that might involve temporary status applications.[br]
-## Requires the [StatModifierSet] class to have a [code]get_temp_applied_stat()[/code] method implemented.[br]
-## [return]: An [Array] representing temporary stats (structure depends on [StatModifierSet] implementation). Returns empty [Array] ([code][][/code]) if no preview is available or method is missing.[br]
-func get_temp_applied_stats() -> Array:
-	var preview_mod_set = get_preview_modifier_set()
-	if preview_mod_set and preview_mod_set.has_method("get_temp_applied_stat"):
-		return preview_mod_set.get_temp_applied_stat()
-	return []
+	# Store current stats before simulation
+	var current_stats = {}
+	var affected_stats = preview_mod_set.get_affected_stats()
+	for stat_name in affected_stats:
+		current_stats[stat_name] = {
+			"value": affected_stats[stat_name].get_value(),
+			"max": affected_stats[stat_name].get_max()
+		}
+
+	# Store current modifier state
+	var current_mod = _current_modifier
+	
+	# Temporarily remove current modifiers
+	if current_mod:
+		current_mod.uninit_modifiers()
+		_current_modifier = null
+	
+	# Get simulated effect
+	var simulated_effect = preview_mod_set.simulate_effect()
+
+	# Restore current modifiers
+	if current_mod:
+		current_mod.init_modifiers(_stat_owner)
+		_current_modifier = current_mod
+	
+	# Calculate differences and format result
+	var result = {}
+	for stat_name in simulated_effect:
+		if stat_name in current_stats:
+			var new_value = simulated_effect[stat_name]["old_value"] + simulated_effect[stat_name]["value_diff"]
+			var new_max = simulated_effect[stat_name]["old_max"] + simulated_effect[stat_name]["max_diff"]
+			result[stat_name] = {
+				"old_value": current_stats[stat_name]["value"],
+				"old_max": current_stats[stat_name]["max"],
+				"value_diff": new_value - current_stats[stat_name]["value"],
+				"max_diff": new_max - current_stats[stat_name]["max"]
+			}
+	
+	return result
 
 ## Calculates the XP and material refund for the current level (if any).[br]
 ## [return]: A [Dictionary] with keys "xp" and "materials".

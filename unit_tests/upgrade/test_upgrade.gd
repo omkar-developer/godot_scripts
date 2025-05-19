@@ -216,10 +216,6 @@ func test_preview_functionality():
 	var simulated_stats = upgrade.simulate_next_effect()
 	assert_not_null(simulated_stats, "Should return simulated stats")
 	
-	# Test get_temp_applied_stats
-	var temp_stats = upgrade.get_temp_applied_stats()
-	assert_not_null(temp_stats, "Should return temporary stats")
-	
 	# Reach max level and test preview again
 	upgrade.auto_upgrade = true
 	upgrade.add_xp(100) # Level 1

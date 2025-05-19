@@ -14,6 +14,11 @@ signal upgrade_pressed
 
 func _ready():
 	upgrade_icon = upgrade_icon
+
+func set_max_level_reached() -> void:
+	if %UpgradeBtn:
+		%UpgradeBtn.text = "MAX LEVEL"
+		%UpgradeBtn.disabled = true
 	
 func update_data():
 	if %Icon: %Icon.texture = upgrade_icon
@@ -42,8 +47,23 @@ func update_data():
 			%Materials.add_child(material_instance)
 			material_instance.set_data(mat)
 	
-	if %Cost: %Cost.text = str(upgrade_cost)
-	if %CostIcon: %CostIcon.texture = upgrade_cost_icon
+	if upgrade_cost_icon == null or upgrade_cost == 0:
+		if %CostContainer: %CostContainer.visible = false
+	else:
+		if %CostContainer: %CostContainer.visible = true		
+
+	if %Cost:
+		if upgrade_cost == 0:
+			%Cost.visible = false
+		else:
+			%Cost.visible = true
+			%Cost.text = str(upgrade_cost)
+	if %CostIcon: 
+		if upgrade_cost_icon == null or upgrade_cost == 0:
+			%CostIcon.visible = false
+		else:
+			%CostIcon.visible = true
+			%CostIcon.texture = upgrade_cost_icon
 
 # data is a dictionary containing material information in the following format:
 # {
@@ -121,24 +141,88 @@ func set_data(data: Dictionary, changes_data:Dictionary = {}, materials_data:Dic
 	upgrade_cost_icon = data.get("upgrade_cost_icon", null)
 	update_data()
 
+func replace_keys(text: String, with: String = "") -> String:
+	var regex = RegEx.new()
+	regex.compile("<[^<>]+>")
+	return regex.sub(text, with, true)
+
+func format_text(text: String, stats: Dictionary, remove_brackets:bool = true) -> String:
+	var formatted = text
+	
+	# Max value format: [stat_name:max]
+	var regex = RegEx.new()
+	regex.compile("\\{(\\w+):max\\}")
+	var results = regex.search_all(formatted)
+	for result in results:
+		var stat_name = result.get_string(1)
+		if stats.has(stat_name):
+			var value = stats[stat_name].get("old_max", 0) + stats[stat_name].get("max_diff", 0)
+			formatted = formatted.replace("{" + stat_name + ":max}", str(value))
+	
+	# Current value format: [stat_name:current]
+	regex.compile("\\{(\\w+):current\\}")
+	results = regex.search_all(formatted)
+	for result in results:
+		var stat_name = result.get_string(1)
+		if stats.has(stat_name):
+			var value = stats[stat_name].get("old_value", 0)
+			formatted = formatted.replace("{" + stat_name + ":current}", str(value))
+	
+	# Simple value format: [stat_name] (but not followed by :something)
+	regex.compile("\\{(\\w+)(?!:)\\}")
+	results = regex.search_all(formatted)
+	for result in results:
+		var stat_name = result.get_string(1)
+		if stats.has(stat_name):
+			var value = stats[stat_name].get("value_diff", 0)
+			formatted = formatted.replace("{" + stat_name + "}", str(value))
+	
+	regex.compile("\\{([^{}]+)\\}")
+	formatted = regex.sub(formatted, "", true)
+
+	if remove_brackets:
+		regex.compile("<([^<>]+)>")
+		results = regex.search_all(formatted)
+		for result in results:
+			var stat_name = result.get_string(1)
+			formatted = formatted.replace("<" + stat_name + ">", stat_name)
+	return formatted
+
 func set_data_from_upgrade(upgrade: Upgrade, _upgrade_name: String = "", _upgrade_description: String = "", _upgrade_icon: Texture2D = null, cost_icon = null, material_icons: Dictionary = {}) -> void:
 	# Get config for current level
 	var config: UpgradeLevelConfig = upgrade.get_current_level_config()
 	
+	var data = {}
+
+	var changes_data = {
+		"Level": {"old_value": upgrade.get_current_level(), "value_diff": 1}
+	}
+
 	if not config:
+		data = {
+		"name": replace_keys(format_text(_upgrade_name, changes_data, false)),
+		"description": replace_keys(format_text(_upgrade_description, changes_data, false)),
+		"icon": _upgrade_icon,
+		"upgrade_cost": 0,
+		"upgrade_cost_icon": cost_icon
+		}
+		set_data(data, {}, {}, material_icons, {})
+		if upgrade.is_max_level():
+			set_max_level_reached()
 		return
 	
+	#TODO: need to set as int
+	# Get stat changes by simulating next effect - this is cleaner as it handles all stat calculations	
+	changes_data.merge(upgrade.simulate_next_effect())
+
 	# Build base data dictionary with passed parameters
-	var data = {
-		"name": _upgrade_name,
-		"description": _upgrade_description,
+	data = {
+		"name": format_text(_upgrade_name, changes_data),
+		"description": format_text(_upgrade_description, changes_data),
 		"icon": _upgrade_icon,
 		"upgrade_cost": config.xp_required,
 		"upgrade_cost_icon": cost_icon
 	}
-	
-	# Get stat changes by simulating next effect - this is cleaner as it handles all stat calculations
-	var changes_data = upgrade.simulate_next_effect()
 	
 	# Get material requirements from config
 	var materials_data = config.required_materials
