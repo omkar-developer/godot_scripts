@@ -21,22 +21,22 @@ extends Control
 				%Icon.visible = true
 				%Icon.texture = icon
 
-@export var stat_value: float:
+@export var stat_value: String:
 	set(v):
 		stat_value = v
-		if %OldValue: %OldValue.text = str(stat_value)
+		if %OldValue: %OldValue.text = stat_value
 
-@export var stat_change: float:
+@export var stat_change: String:
 	set(v):
 		stat_change = v
 		if %NewValue:
-			if stat_change == 0.0:
+			if stat_change.is_empty():
 				%NewValue.visible = false
 				%Arrows.visible = false
 			else:
 				%NewValue.visible = true
 				%Arrows.visible = true
-				%NewValue.text = str(stat_change)
+				%NewValue.text = stat_change
 
 func _ready():
 	stat_name = stat_name
@@ -47,5 +47,5 @@ func _ready():
 func set_data(data: Dictionary):
 	stat_name = data.get("name", "")
 	icon = data.get("icon", null)
-	stat_value = data.get("value", "")
-	stat_change = data.get("change", "")
+	stat_value = str(data.get("value", 0))
+	stat_change = str(data.get("change", 0))

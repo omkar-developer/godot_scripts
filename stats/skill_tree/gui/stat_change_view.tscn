@@ -15,11 +15,13 @@ outline_color = Color(9.14484e-07, 0.517071, 0.20784, 1)
 shadow_size = 7
 shadow_color = Color(0, 0, 0, 0.37)
 
-[node name="PanelContainer" type="PanelContainer"]
+[node name="StatChangeView" type="PanelContainer"]
 offset_right = 368.0
 offset_bottom = 26.0
 script = ExtResource("1_7hof5")
 icon = SubResource("AtlasTexture_tdahu")
+stat_value = 0.0
+stat_change = 0.0
 
 [node name="MarginContainer" type="MarginContainer" parent="."]
 layout_mode = 2

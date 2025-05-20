@@ -211,7 +211,6 @@ func set_data_from_upgrade(upgrade: Upgrade, _upgrade_name: String = "", _upgrad
 			set_max_level_reached()
 		return
 	
-	#TODO: need to set as int
 	# Get stat changes by simulating next effect - this is cleaner as it handles all stat calculations	
 	changes_data.merge(upgrade.simulate_next_effect())
 
