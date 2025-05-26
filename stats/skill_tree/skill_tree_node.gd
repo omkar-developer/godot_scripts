@@ -88,3 +88,48 @@ func reset_node_internal():
 	unlocked = false
 	if upgrade:
 		upgrade.reset_upgrades()
+
+func to_dict() -> Dictionary:
+	return {
+		"upgrade": {
+			"class_name": upgrade.get_script().get_global_name() if upgrade else "",
+			"data": upgrade.to_dict() if upgrade else {}
+		},
+		"auto_upgrade_to_level_1": auto_upgrade_to_level_1,
+		"required_parent_level": required_parent_level,
+		"steps_reached": steps_reached,
+		"unlocked": unlocked,
+		"total_parents_level": total_parents_level
+	}
+
+func from_dict(data: Dictionary, stat_owner: Object = null, inventory: Object = null, _skill_tree: SkillTree = null) -> void:
+	if data == null:
+		return
+		
+	auto_upgrade_to_level_1 = data.get("auto_upgrade_to_level_1", false)
+	required_parent_level = data.get("required_parent_level", 1)
+	steps_reached = data.get("steps_reached", 0)
+	unlocked = data.get("unlocked", false)
+	total_parents_level = data.get("total_parents_level", 0)
+	
+	var upgrade_data = data.get("upgrade", {})
+	if upgrade_data.has("class_name") and upgrade_data["class_name"] != "":
+		upgrade = _instantiate_class(upgrade_data["class_name"])
+		if upgrade:
+			upgrade.from_dict(upgrade_data["data"])
+	
+	init_node(stat_owner, inventory, _skill_tree)
+
+func _instantiate_class(class_type: String) -> Object:
+	var global_classes = ProjectSettings.get_global_class_list()
+	
+	# Find the class in the global class list
+	for gc in global_classes:
+		if gc["class"] == class_type:
+			# Load the script and instantiate it
+			var script = load(gc["path"])
+			if script:
+				return script.new()
+	
+	push_warning("Unknown class type: %s, defaulting to null." % class_type)
+	return null
