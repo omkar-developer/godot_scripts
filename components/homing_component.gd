@@ -7,11 +7,11 @@ var movement: MovementComponent
 var update_interval: float = 0.1
 var time_since_update: float = 0.0
 var homing_enabled: bool = true
-var update_direction_every_frame: bool = false
+var update_direction_every_frame: bool = true
 var no_target_behavior_stop: bool = false
 
-func _init(_owner: Node2D, _movement: MovementComponent, _target: Node2D = null):
-	self.owner = _owner
+func _init(_movement: MovementComponent, _target: Node2D = null):
+	self.owner = _movement.owner
 	self.movement = _movement
 	self.target = _target
 

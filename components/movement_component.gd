@@ -17,3 +17,6 @@ func _init(_owner: Node2D, _speed := 100.0, _direction := Vector2.RIGHT):
 func update(delta: float):
 	if owner:
 		owner.position += normalized_direction * speed * delta
+
+func move_toward(target_position: Vector2):
+	normalized_direction = (target_position - owner.position).normalized()
