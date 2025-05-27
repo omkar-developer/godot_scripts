@@ -10,6 +10,8 @@
 extends Resource
 class_name Upgrade
 
+#TODO: add feature to not cosume materials on level up only check if they are enough
+
 ## Emitted when an upgrade is successfully applied.[br]
 ## Passes the [param new_level] that was just reached and the [param applied_config] ([UpgradeLevelConfig]) for that level.
 signal upgrade_applied(new_level: int, applied_config: UpgradeLevelConfig)
