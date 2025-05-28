@@ -2,23 +2,70 @@ class_name PhysicsMovementComponent
 extends RefCounted
 
 var owner: Node2D
-var velocity := Vector2.ZERO
+var movement: MovementComponent
 var acceleration := Vector2.ZERO
-var max_speed := 200.0
-var friction := 0.0
+var constant_acceleration := Vector2.ZERO
 
-func _init(_owner: Node2D, _max_speed := 200.0):
-	self.owner = _owner
-	self.max_speed = _max_speed
+# Limits
+var mass := 1.0
+
+# Forces
+var friction := 0.0
+var damping := 0.0
+
+# Gravity
+var use_gravity := false
+var gravity_scale := 1.0
+var gravity := Vector2(0, 980)
+
+func _init(_movement: MovementComponent, _mass := 1.0, _use_gravity := false):
+	movement = _movement
+	use_gravity = _use_gravity
+	owner = _movement.owner
+	mass = max(_mass, 0.0001)  # prevent divide-by-zero
 
 func apply_force(force: Vector2):
-	acceleration += force
+	acceleration += force / mass
+
+func apply_impulse(impulse: Vector2):
+	movement.velocity += impulse
+
+func set_constant_velocity(new_velocity: Vector2):
+	movement.velocity = new_velocity
+
+func get_constant_velocity():
+	return movement.velocity
+
+func set_constant_acceleration(new_acceleration: Vector2):
+	constant_acceleration = new_acceleration
+
+func set_friction_seconds(time: float):
+	if time > 0:
+		friction = movement.velocity.length() / time
+	else:
+		friction = 0.0
 
 func update(delta: float):
-	velocity += acceleration * delta
+	if use_gravity:
+		apply_force(gravity * gravity_scale * mass)
+
+	# Damping like air resistance
+	if damping > 0.0:
+		apply_force(-movement.velocity * damping)
+
+	# Apply acceleration forces
+	movement.velocity += acceleration * delta
+	movement.velocity += constant_acceleration * delta
+
+	# Apply friction
 	if friction > 0.0:
-		velocity = velocity.move_toward(Vector2.ZERO, friction * delta)
+		movement.velocity = movement.velocity.move_toward(Vector2.ZERO, friction * delta)
+
+	# Limit velocity
+	movement.velocity = movement.velocity.limit_length(movement.speed)
 	
-	velocity = velocity.limit_length(max_speed)
-	owner.position += velocity * delta
+	# Update movement component
+	movement.update(delta)
+
+	# Reset frame-based acceleration
 	acceleration = Vector2.ZERO

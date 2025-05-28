@@ -2,9 +2,9 @@ class_name SteeringManagerComponent
 extends RefCounted
 
 var steering_behaviors: Array[RefCounted] = []
-var movement: PhysicsMovementComponent
+var movement: MovementComponent
 
-func _init(_movement: PhysicsMovementComponent):
+func _init(_movement: MovementComponent):
 	movement = _movement
 
 func add_behavior(behavior: RefCounted, weight: float = 1.0):
@@ -18,5 +18,5 @@ func update(delta: float):
 		if "calculate" in behavior:
 			total_force += behavior.calculate() * weight
 	
-	movement.apply_force(total_force)
+	movement.direction = movement.direction + total_force * delta
 	movement.update(delta)
