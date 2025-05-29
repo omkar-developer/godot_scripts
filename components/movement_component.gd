@@ -68,3 +68,6 @@ func update(delta: float):
 
 func move_toward(target_position: Vector2):
 	normalized_direction = (target_position - owner.global_position).normalized()
+
+func limit_velocity():
+	velocity = velocity.limit_length(speed)

@@ -61,8 +61,8 @@ func update(delta: float):
 	if friction > 0.0:
 		movement.velocity = movement.velocity.move_toward(Vector2.ZERO, friction * delta)
 
-	# Limit velocity
-	movement.velocity = movement.velocity.limit_length(movement.speed)
+	# Limit velocity using the function from MovementComponent
+	movement.limit_velocity()
 	
 	# Update movement component
 	movement.update(delta)
