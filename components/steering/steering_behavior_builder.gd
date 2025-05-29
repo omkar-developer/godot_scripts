@@ -207,5 +207,5 @@ func clear_behaviors() -> SteeringBehaviorBuilder:
 	return self
 
 # Static factory method
-static func create(owner: Node2D, movement: MovementComponent, steering_manager: SteeringManagerComponent) -> SteeringBehaviorBuilder:
-	return SteeringBehaviorBuilder.new(owner, movement, steering_manager)
+static func create(owner: Node2D, movement: MovementComponent, _steering_manager: SteeringManagerComponent) -> SteeringBehaviorBuilder:
+	return SteeringBehaviorBuilder.new(owner, movement, _steering_manager)
