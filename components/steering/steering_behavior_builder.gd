@@ -9,7 +9,7 @@ var steering_manager: SteeringManagerComponent
 # Common parameters
 var obstacle_collision_mask := 1
 var agent_collision_mask := 2
-var ray_length := 100.0
+var ray_length := 200.0
 var separation_radius := 60.0
 var max_speed := 200.0
 
@@ -44,7 +44,7 @@ func basic_ai(target: Node2D, arrive_radius := 100.0, stop_radius := 15.0) -> St
 	)
 	steering_manager.add_behavior(
 		OptimizedRaycastAvoidance.new(ray_length, obstacle_collision_mask, owner_node, movement_comp), 
-		2.0
+		2.5
 	)
 	return self
 
@@ -101,7 +101,6 @@ func predator(target: Node2D, hunt_radius := 200.0) -> SteeringBehaviorBuilder:
 	
 	# Seek target aggressively
 	var seek_behavior = SeekSteering.new(target, owner_node, movement_comp)
-	seek_behavior.effect_radius = hunt_radius
 	steering_manager.add_behavior(seek_behavior, 1.2)
 	
 	# Separate from other predators
