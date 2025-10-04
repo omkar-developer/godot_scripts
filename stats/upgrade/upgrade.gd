@@ -11,6 +11,7 @@ extends Resource
 class_name Upgrade
 
 #TODO: add feature to not cosume materials on level up only check if they are enough
+#TODO: try to not apply and remove when getign temp modifiers instead made save state before applt upgrade or save the diff.
 
 ## Emitted when an upgrade is successfully applied.[br]
 ## Passes the [param new_level] that was just reached and the [param applied_config] ([UpgradeLevelConfig]) for that level.

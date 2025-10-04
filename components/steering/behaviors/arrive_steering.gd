@@ -20,10 +20,10 @@ func calculate() -> Vector2:
 	var to_target = target.global_position - owner.global_position
 	var distance = to_target.length()
 	
-	# If we're very close to target, stop completely
+	# If we're very close to target, apply strong stopping force
 	if distance < stop_radius:
-		# Return force to counteract current velocity (bring to stop)
-		return -movement.velocity
+		# Return strong force to stop (not just -velocity, but scaled)
+		return -movement.velocity * 10.0  # Strong damping to stop quickly
 	
 	# Get desired velocity
 	var desired = to_target.normalized() * movement.speed
@@ -31,7 +31,7 @@ func calculate() -> Vector2:
 	# Scale speed based on distance if within slow_radius
 	if distance < slow_radius:
 		var speed_factor = (distance - stop_radius) / (slow_radius - stop_radius)
-		speed_factor = max(0.0, speed_factor)  # Ensure non-negative
+		speed_factor = max(0.0, speed_factor)
 		desired *= speed_factor
 	
 	var steering = desired - movement.velocity

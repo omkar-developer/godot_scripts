@@ -8,7 +8,7 @@ var speed: float = 100.0
 var direction: Vector2 = Vector2.ZERO:
 	set(value):
 		direction = value
-		normalized_direction = value.normalized()
+		normalized_direction = value.normalized() if value.length() > 0.001 else Vector2.ZERO
 
 var normalized_direction: Vector2 = Vector2.ZERO:
 	set(value):
