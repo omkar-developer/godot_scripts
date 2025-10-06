@@ -33,6 +33,8 @@ func remove_module(module: BMModule) -> void:
 ## Apply a modifier
 ## Returns true if successfully applied
 func apply_modifier(_modifier: StatModifierSet, copy: bool = true) -> bool:
+	if _modifier == null:
+		return false
 	var modifier = _modifier.copy() if copy else _modifier
 	# Let modules handle pre-application
 	for module in _modules:
@@ -116,6 +118,17 @@ func has_modifier(modifier_name: String) -> bool:
 
 ## Process method for updating modifiers
 func _process(delta: float) -> void:
+	# WARNING: Race condition possible if modules modify _active_modifiers during processing.
+    # If a module's process() or callbacks call apply_modifier() or remove_modifier(),
+    # this can modify the dictionary while we're iterating over it.
+    # Symptoms: Skipped modifiers, unexpected behavior, or crashes in rare cases.
+    # 
+    # Safe patterns:
+    # - Modules should queue changes and apply them after _process()
+    # - Or snapshot the keys before iteration (see fix below if needed)
+    #
+    # To fix: Use var modifier_names = _active_modifiers.keys() and iterate that instead
+    
 	var to_remove: Array = []
 	
 	# Update modifiers

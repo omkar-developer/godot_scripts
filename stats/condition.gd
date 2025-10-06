@@ -148,10 +148,10 @@ func _remove_connections() -> void:
 ## Initializes the condition with the given parent object.[br]
 ## [param parent]: The parent object to retrieve stats from.
 func init_stat(parent: Object) -> void:
-	if parent == null or !parent.has_method("get_stat"): return
+	if parent == null: return
 	if _ref_stat1 != null or _ref_stat2 != null: return
-	_ref_stat1 = parent.get_stat(_ref_stat1_name)
-	_ref_stat2 = parent.get_stat(_ref_stat2_name)
+	_ref_stat1 = parent.get(_ref_stat1_name.to_snake_case()) as Stat
+	_ref_stat2 = parent.get(_ref_stat2_name.to_snake_case()) as Stat
 	_make_connections()
 	if _condition_type == ConditionType.MATH_EXPRESSION and _math_expression != "":
 		_expression = Expression.new()

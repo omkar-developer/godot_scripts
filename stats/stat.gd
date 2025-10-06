@@ -114,7 +114,9 @@ func get_typed_value(raw_value: float) -> float:
 		final_value_clamped = value
 		on_value_changed()
 
-## Percent modifier applied to the base value.
+## Percent modifier applied to base value.
+## Value of 100 means +100% (2x multiplier), not 100% total.
+## Formula: base_value * (1 + percent_modifier/100)
 @export var percent_modifier:float:
 	set(value):
 		if percent_modifier == value: return
@@ -569,3 +571,41 @@ func from_dict(dict: Dictionary) -> void:
 	stat_type = dict.get("stat_type", stat_type)
 	_enable_signal = true
 	on_value_changed()
+
+#region Factory Methods
+## Creates a stat with just a base value, no clamping.
+## Useful for stats that can grow unbounded (damage, speed bonuses, etc.)
+static func create_value(base: float) -> Stat:
+	var s = Stat.new()
+	s.base_value = base
+	s.base_value_clamped = false
+	s.final_value_clamped = false
+	return s
+
+## Creates a clamped stat with min/max bounds.
+## Useful for resources (health, mana, shield) or percentage stats (0-1 range).
+static func create_clamped(base: float, minimum: float, maximum: float) -> Stat:
+	var s = Stat.new()
+	s.base_value = base
+	s.min_value = minimum
+	s.max_value = maximum
+	s.base_value_clamped = true
+	s.final_value_clamped = true
+	return s
+
+## Creates a clamped stat where base starts at max.
+## Common pattern for health/shield initialization.
+static func create_full(maximum: float, minimum: float = 0.0) -> Stat:
+	var s = Stat.new()
+	s.base_value = maximum
+	s.min_value = minimum
+	s.max_value = maximum
+	s.base_value_clamped = true
+	s.final_value_clamped = true
+	return s
+
+## Creates a percentage stat (0.0 to 1.0 range, clamped).
+## Useful for crit chance, damage resistance, etc.
+static func create_percentage(base: float = 0.0, maximum: float = 1.0, minimum: float = 0.0) -> Stat:
+	return create_clamped(base, minimum, maximum)
+#endregion

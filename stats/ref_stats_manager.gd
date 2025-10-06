@@ -149,8 +149,8 @@ func evaluate_expression(expression_str: String) -> Variant:
 ## [param stat_type]: Type of value to extract from the stat
 ## [return]: True if the stat was added successfully
 func add_ref_stat(stat_name: String, stat_type: int) -> bool:
-	if _parent == null or not _parent.has_method("get_stat"):
-		push_error("RefStatManager: Parent object is invalid or doesn't have get_stat method")
+	if _parent == null:
+		push_error("RefStatManager: Parent object is invalid")
 		return false
 	
 	var ref_key = create_expression_var_name(stat_name, stat_type)
@@ -158,7 +158,8 @@ func add_ref_stat(stat_name: String, stat_type: int) -> bool:
 		# Already tracking this stat with this type
 		return true
 		
-	var stat = _parent.get_stat(stat_name)
+	var normalized_name = stat_name.to_snake_case()
+	var stat = _parent.get(normalized_name) as Stat
 	if stat == null:
 		push_warning("RefStatManager: Could not find stat named '%s'" % stat_name)
 		return false

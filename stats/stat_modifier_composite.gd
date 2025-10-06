@@ -130,7 +130,7 @@ func init_stat(parent: Object) -> bool:
 	
 	# Set up reference stat if specified
 	if _ref_stat_name != "":
-		_ref_stat = parent.get_stat(_ref_stat_name)
+		_ref_stat = parent.get(_ref_stat_name.to_snake_case()) as Stat
 		
 		# Connect signal for dynamic updates if needed
 		if !_snapshot_stats and _ref_stat != null:

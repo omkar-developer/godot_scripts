@@ -24,6 +24,14 @@ enum StatModifierType {
 	SET_MIN_VALUE ## Set min value of a stat use only in special cases as directly settig value cant be tracked.
 }
 
+## Enum defining strategies for merging modifiers
+enum MergeStrategy {
+	ADD,        # Current behavior: _value += mod._value
+	OVERRIDE,   # Take new value: _value = mod._value
+	MAX,        # Take larger: _value = max(_value, mod._value)
+	MIN         # Take smaller: _value = min(_value, mod._value)
+}
+
 ## Name of the stat this modifier affects.
 @export var _stat_name: String
 
@@ -35,6 +43,9 @@ enum StatModifierType {
 
 ## Whether this modifier should only be applied once.
 @export var _apply_only_once := true
+
+## The strategy to use when merging modifiers.
+@export var merge_strategy := MergeStrategy.ADD
 
 ## The stat instance this modifier is linked to.
 var _stat: Stat
@@ -59,11 +70,9 @@ func init_stat(parent: Object) -> bool:
 	if _stat != null: 
 		uninit_stat()
 		
-	if not parent.has_method("get_stat"):
-		push_error("Parent object doesn't have get_stat method")
-		return false
-		
-	_stat = parent.get_stat(_stat_name)
+
+	var normalized_name = _stat_name.to_snake_case()
+	_stat = parent.get(normalized_name) as Stat
 	
 	if _stat == null:
 		push_warning("Could not find stat named '%s' in parent" % _stat_name)
@@ -89,7 +98,15 @@ func merge(mod: StatModifier) -> bool:
 		push_warning("Attempting to merge modifiers of different types or stats")
 		return false
 		
-	set_value(_value + mod._value)
+	match merge_strategy:
+		MergeStrategy.ADD:
+			set_value(_value + mod._value)
+		MergeStrategy.OVERRIDE:
+			set_value(mod._value)
+		MergeStrategy.MAX:
+			set_value(max(_value, mod._value))
+		MergeStrategy.MIN:
+			set_value(min(_value, mod._value))
 	return true
 
 ## Checks if another modifier is equivalent to this one (same type and stat name).
@@ -277,6 +294,7 @@ func to_dict() -> Dictionary:
 		"is_applied": _is_applied,
 		"apply_only_once": _apply_only_once,
 		"applied_value" : _applied_value,
+		"merge_strategy": merge_strategy
 	}
 
 ## Loads this modifier from a dictionary.
@@ -287,3 +305,4 @@ func from_dict(dict: Dictionary) -> void:
 	_is_applied = dict.get("is_applied", _is_applied)
 	_apply_only_once = dict.get("apply_only_once", _apply_only_once)
 	_applied_value = dict.get("applied_value", _applied_value)
+	merge_strategy = dict.get("merge_strategy", merge_strategy)
