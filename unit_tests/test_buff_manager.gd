@@ -109,7 +109,7 @@ class MockBMModule extends BMModule:
 
 ## Test initialization
 func test_initialization():
-	var buff_manager = BuffManager.new()
+	var buff_manager = autofree(BuffManager.new())
 	
 	assert_eq(buff_manager._active_modifiers.size(), 0, "Active modifiers should be empty on initialization")
 	assert_eq(buff_manager._modules.size(), 0, "Modules should be empty on initialization")
@@ -134,7 +134,7 @@ func test_enter_tree_parent_initialization():
 
 ## Test module management
 func test_add_module():
-	var buff_manager = BuffManager.new()
+	var buff_manager = autofree(BuffManager.new())
 	var module = create_test_module()
 	
 	buff_manager.add_module(module)
@@ -143,7 +143,7 @@ func test_add_module():
 	assert_eq(buff_manager._modules[0], module, "Module in array should match the added module")
 
 func test_remove_module():
-	var buff_manager = BuffManager.new()
+	var buff_manager = autofree(BuffManager.new())
 	var module = create_test_module()
 	
 	buff_manager.add_module(module)
@@ -153,7 +153,7 @@ func test_remove_module():
 	assert_eq(buff_manager._modules.size(), 0, "Module should be removed from the modules array")
 
 func test_module_callbacks():
-	var buff_manager = BuffManager.new()
+	var buff_manager = autofree(BuffManager.new())
 	var mock_module = MockBMModule.new()
 	var parent = create_parent_with_stat({"Health": create_test_stat()})
 	buff_manager._parent = parent
@@ -183,7 +183,7 @@ func test_module_callbacks():
 	assert_true(mock_module.after_remove_called, "on_after_remove should be called")
 
 func test_module_blocking_application():
-	var buff_manager = BuffManager.new()
+	var buff_manager = autofree(BuffManager.new())
 	var mock_module = MockBMModule.new()
 	mock_module.before_apply_result = false  # Module will block application
 	var parent = create_parent_with_stat({"Health": create_test_stat()})
@@ -206,7 +206,7 @@ func test_module_blocking_application():
 
 ## Test modifier application and management
 func test_apply_modifier():
-	var buff_manager = BuffManager.new()
+	var buff_manager = autofree(BuffManager.new())
 	var parent = create_parent_with_stat({"Health": create_test_stat()})
 	buff_manager._parent = parent
 	
@@ -239,7 +239,7 @@ func test_apply_modifier():
 	assert_not_null(output["emitted_modifier"], "Signal should emit modifier reference")
 
 func test_apply_duplicate_modifier():
-	var buff_manager = BuffManager.new()
+	var buff_manager = autofree(BuffManager.new())
 	var parent = create_parent_with_stat({"Health": create_test_stat()})
 	buff_manager._parent = parent
 	
@@ -270,7 +270,7 @@ func test_apply_duplicate_modifier():
 	assert_true(merged_mod_set != mod_set1, "The merged set should not be the same instance as the first set")
 
 func test_remove_modifier():
-	var buff_manager = BuffManager.new()
+	var buff_manager = autofree(BuffManager.new())
 	var parent = create_parent_with_stat({"Health": create_test_stat()})
 	buff_manager._parent = parent
 	
@@ -305,7 +305,7 @@ func test_remove_modifier():
 	assert_not_null(output["emitted_modifier"], "Signal should emit modifier reference")
 
 func test_remove_nonexistent_modifier():
-	var buff_manager = BuffManager.new()
+	var buff_manager = autofree(BuffManager.new())
 	
 	# Track signal emission to make sure it's not emitted
 	var output = {
@@ -320,7 +320,7 @@ func test_remove_nonexistent_modifier():
 	assert_false(output["signal_emitted"], "No signal should be emitted when removing non-existent modifier")
 
 func test_get_modifier():
-	var buff_manager = BuffManager.new()
+	var buff_manager = autofree(BuffManager.new())
 	var parent = create_parent_with_stat({"Health": create_test_stat()})
 	buff_manager._parent = parent
 	
@@ -341,7 +341,7 @@ func test_get_modifier():
 	assert_null(nonexistent_mod, "Should return null for non-existent modifier")
 
 func test_clear_all_modifiers():
-	var buff_manager = BuffManager.new()
+	var buff_manager = autofree(BuffManager.new())
 	var parent = create_parent_with_stat({
 		"Health": create_test_stat(),
 		"Strength": create_test_stat()
@@ -375,7 +375,7 @@ func test_clear_all_modifiers():
 
 ## Test processing
 func test_process_updates_modifiers():
-	var buff_manager = BuffManager.new()
+	var buff_manager = autofree(BuffManager.new())
 	var parent = create_parent_with_stat({"Health": create_test_stat()})
 	buff_manager._parent = parent
 	
@@ -397,7 +397,7 @@ func test_process_updates_modifiers():
 	assert_eq(applied_mod.condition._timer, 1.9, "Delta time should be passed to modifier's _process")
 
 func test_process_deletes_marked_modifiers():
-	var buff_manager = BuffManager.new()
+	var buff_manager = autofree(BuffManager.new())
 	var parent = create_parent_with_stat({"Health": create_test_stat()})
 	buff_manager._parent = parent
 	
@@ -415,7 +415,7 @@ func test_process_deletes_marked_modifiers():
 	assert_false(buff_manager.has_modifier("TestBuff"), "Marked modifier should be removed during processing")
 
 func test_process_calls_module_process():
-	var buff_manager = BuffManager.new()
+	var buff_manager = autofree(BuffManager.new())
 	var mock_module = MockBMModule.new()
 	buff_manager.add_module(mock_module)
 	
@@ -427,7 +427,7 @@ func test_process_calls_module_process():
 
 ## Test signal emission
 func test_signals():
-	var buff_manager = BuffManager.new()
+	var buff_manager = autofree(BuffManager.new())
 	var parent = create_parent_with_stat({"Health": create_test_stat()})
 	buff_manager._parent = parent
 	

@@ -119,20 +119,19 @@ func init_stat(parent: Object) -> bool:
 	
 	# If using expression mode, set up the expression
 	if _math_expression != "":
-		# Add all stats from the expression
 		_ref_stat_manager.add_ref_stats_from_expression(_math_expression)
-		# Set the expression
 		_ref_stat_manager.set_expression(_math_expression)
 		
-		# Connect signal for dynamic updates if needed
 		if !_snapshot_stats:
 			_ref_stat_manager.connect("ref_stats_changed", _update_value.bind(0.0, 0.0, 0.0, 0.0))
 	
-	# Set up reference stat if specified
+	# Set up reference stat if specified with fallback mechanism
 	if _ref_stat_name != "":
-		_ref_stat = parent.get(_ref_stat_name.to_snake_case()) as Stat
+		if parent.has_method("get_stat"):
+			_ref_stat = parent.get_stat(_ref_stat_name)
+		if _ref_stat == null:
+			_ref_stat = parent.get(_ref_stat_name.to_snake_case()) as Stat
 		
-		# Connect signal for dynamic updates if needed
 		if !_snapshot_stats and _ref_stat != null:
 			_ref_stat.connect("value_changed", _update_value)
 	

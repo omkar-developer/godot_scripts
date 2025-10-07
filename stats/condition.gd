@@ -150,8 +150,19 @@ func _remove_connections() -> void:
 func init_stat(parent: Object) -> void:
 	if parent == null: return
 	if _ref_stat1 != null or _ref_stat2 != null: return
-	_ref_stat1 = parent.get(_ref_stat1_name.to_snake_case()) as Stat
-	_ref_stat2 = parent.get(_ref_stat2_name.to_snake_case()) as Stat
+	
+	if not _ref_stat1_name.is_empty():
+		if parent.has_method("get_stat"):
+			_ref_stat1 = parent.get_stat(_ref_stat1_name)
+		if _ref_stat1 == null:
+			_ref_stat1 = parent.get(_ref_stat1_name.to_snake_case()) as Stat
+	
+	if not _ref_stat2_name.is_empty():
+		if parent.has_method("get_stat"):
+			_ref_stat2 = parent.get_stat(_ref_stat2_name)
+		if _ref_stat2 == null:
+			_ref_stat2 = parent.get(_ref_stat2_name.to_snake_case()) as Stat
+	
 	_make_connections()
 	if _condition_type == ConditionType.MATH_EXPRESSION and _math_expression != "":
 		_expression = Expression.new()

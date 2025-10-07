@@ -78,27 +78,64 @@ func _on_remove_signal() -> void:
 	if pause_on_remove_signal: process = false
 	if resume_on_remove_signal: process = true
 
-## Connects signals
+## Connects the apply and remove signals to the parent object
 func _connect_signals() -> void:
-	if apply_signal.is_empty() and remove_signal.is_empty(): return
-	if _parent != null:
-		if _parent.has_signal(apply_signal) and not _parent.is_connected(apply_signal, _on_apply_signal):
-			_parent.connect(apply_signal, _on_apply_signal)
-		else:
-			push_error("Failed to connect signal: " + apply_signal)
-		if _parent.has_signal(remove_signal) and not _parent.is_connected(remove_signal, _on_remove_signal):
-			_parent.connect(remove_signal, _on_remove_signal)
-		else:
-			push_error("Failed to connect signal: " + remove_signal)
+	if apply_signal.is_empty() and remove_signal.is_empty():
+		return
+	if _parent == null:
+		return
 
-## Disconnects signals
+	var apply_sig = null
+	var remove_sig = null
+
+	if _parent.has_method("get_signal"):
+		apply_sig = _parent.get_signal(apply_signal)
+		remove_sig = _parent.get_signal(remove_signal)
+
+	if apply_sig != null:
+		if not apply_sig.is_connected(_on_apply_signal):
+			apply_sig.connect(_on_apply_signal)
+	elif not apply_signal.is_empty() and _parent.has_signal(apply_signal):
+		if not _parent.is_connected(apply_signal, _on_apply_signal):
+			_parent.connect(apply_signal, _on_apply_signal)
+	else:
+		push_error("Failed to connect apply signal: " + str(apply_signal))
+
+	if remove_sig != null:
+		if not remove_sig.is_connected(_on_remove_signal):
+			remove_sig.connect(_on_remove_signal)
+	elif not remove_signal.is_empty() and _parent.has_signal(remove_signal):
+		if not _parent.is_connected(remove_signal, _on_remove_signal):
+			_parent.connect(remove_signal, _on_remove_signal)
+	else:
+		push_error("Failed to connect remove signal: " + str(remove_signal))
+
+
+## Disconnects the apply and remove signals from the parent object
 func _disconnect_signals() -> void:
-	if apply_signal.is_empty() and remove_signal.is_empty(): return
-	if _parent != null:
-		if _parent.has_signal(apply_signal) and _parent.is_connected(apply_signal, _on_apply_signal):
-			_parent.disconnect(apply_signal, _on_apply_signal)
-		if _parent.has_signal(remove_signal) and _parent.is_connected(remove_signal, _on_remove_signal):
-			_parent.disconnect(remove_signal, _on_remove_signal)		
+	if apply_signal.is_empty() and remove_signal.is_empty():
+		return
+	if _parent == null:
+		return
+
+	var apply_sig = null
+	var remove_sig = null
+
+	if _parent.has_method("get_signal"):
+		apply_sig = _parent.get_signal(apply_signal)
+		remove_sig = _parent.get_signal(remove_signal)
+
+	if apply_sig != null:
+		if apply_sig.is_connected(_on_apply_signal):
+			apply_sig.disconnect(_on_apply_signal)
+	elif _parent.has_signal(apply_signal) and _parent.is_connected(apply_signal, _on_apply_signal):
+		_parent.disconnect(apply_signal, _on_apply_signal)
+
+	if remove_sig != null:
+		if remove_sig.is_connected(_on_remove_signal):
+			remove_sig.disconnect(_on_remove_signal)
+	elif _parent.has_signal(remove_signal) and _parent.is_connected(remove_signal, _on_remove_signal):
+		_parent.disconnect(remove_signal, _on_remove_signal)
 
 ## Called when the condition state changes
 func _on_condition_changed(result: bool) -> void:

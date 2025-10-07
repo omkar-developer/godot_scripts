@@ -157,19 +157,23 @@ func add_ref_stat(stat_name: String, stat_type: int) -> bool:
 	if _ref_stats.has(ref_key):
 		# Already tracking this stat with this type
 		return true
-		
-	var normalized_name = stat_name.to_snake_case()
-	var stat = _parent.get(normalized_name) as Stat
+	
+	var stat: Stat = null
+	if _parent.has_method("get_stat"):
+		stat = _parent.get_stat(stat_name)
+	if stat == null:
+		stat = _parent.get(stat_name.to_snake_case()) as Stat
+	
 	if stat == null:
 		push_warning("RefStatManager: Could not find stat named '%s'" % stat_name)
 		return false
-		
+	
 	var entry = RefStatEntry.new(stat, stat_type, stat_name)
 	_ref_stats[ref_key] = entry
 	
 	if _dynamic_update:
 		_connect_stat_signal(stat)
-		
+	
 	return true
 
 ## Extracts reference stat names and types from an expression string
