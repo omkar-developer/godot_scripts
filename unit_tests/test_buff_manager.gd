@@ -46,7 +46,9 @@ func get_stat(stat_name: String):
 func create_test_modifier(stat_name: String = "Health", 
 						  type = StatModifierClassScript.StatModifierType.FLAT, 
 						  value: float = 50.0) -> StatModifier:
-	return StatModifier.new(stat_name, type, value)
+	var mod = StatModifier.new(stat_name, type, value)
+	mod._apply_only_once = false  # Allow reapplication in tests
+	return mod
 
 ## Helper function to create a StatModifierSet for testing
 func create_test_modifier_set(mod_name: String = "TestModSet", 

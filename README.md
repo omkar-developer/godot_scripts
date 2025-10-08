@@ -49,6 +49,7 @@ var ffm = FlowFieldManager.new(32, 64, 64, true)
 ```
 
 ### Stat System
+[Docs](./stats_system.md)
 ```gdscript
 var stat = Stat.new()
 stat.base_value = 10
