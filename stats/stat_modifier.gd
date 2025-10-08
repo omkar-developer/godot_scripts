@@ -205,8 +205,7 @@ func simulate_effect() -> Dictionary:
 ## Applies the modifier to the stat and returns the actual amount applied
 func apply(apply_value:float = 0.0) -> float:
 	if not is_valid(): return 0.0
-	if _is_applied and _apply_only_once: 
-		push_warning("Attempted to reapply a one-time modifier")
+	if _is_applied and _apply_only_once:
 		return 0.0
 	if apply_value == 0.0:
 		apply_value = _value

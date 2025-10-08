@@ -33,9 +33,12 @@ func remove_module(module: BMModule) -> void:
 ## Apply a modifier
 ## Returns true if successfully applied
 func apply_modifier(_modifier: StatModifierSet, copy: bool = true) -> bool:
-	if _modifier == null:
+	if _modifier == null or _modifier.is_marked_for_deletion():
+		push_warning("Cannot apply null or deleted modifier")
 		return false
+	
 	var modifier = _modifier.copy() if copy else _modifier
+	
 	# Let modules handle pre-application
 	for module in _modules:
 		if not module.on_before_apply(modifier):
@@ -43,14 +46,33 @@ func apply_modifier(_modifier: StatModifierSet, copy: bool = true) -> bool:
 	
 	var modifier_name = modifier.get_modifier_name()
 	
-	# Initialize and store modifier    
-	if has_modifier(modifier_name):
-		_active_modifiers[modifier_name].merge_mod(modifier)
-	else:
-		modifier.init_modifiers(_parent)
-		_active_modifiers[modifier_name] = modifier
+	# Handle different stack modes
+	match modifier.stack_mode:
+		StatModifierSet.StackMode.INDEPENDENT:
+			if not _active_modifiers.has(modifier_name):
+				_active_modifiers[modifier_name] = []
+			
+			var instances: Array = _active_modifiers[modifier_name]
+			
+			# Per-source limit
+			if modifier.stack_source_id != "" and modifier.max_stacks > 0:
+				var source_count = 0
+				for inst in instances:
+					if inst.stack_source_id == modifier.stack_source_id:
+						source_count += 1
+				if source_count >= modifier.max_stacks:
+					return false
+			
+			modifier.init_modifiers(_parent)
+			instances.append(modifier)
+		
+		_:  # All other modes
+			if has_modifier(modifier_name):
+				_active_modifiers[modifier_name].merge_mod(modifier)
+			else:
+				modifier.init_modifiers(_parent)
+				_active_modifiers[modifier_name] = modifier
 	
-	# Let modules handle post-application
 	for module in _modules:
 		module.on_after_apply(modifier)
 	
@@ -58,24 +80,50 @@ func apply_modifier(_modifier: StatModifierSet, copy: bool = true) -> bool:
 	return true
 
 ## Remove a specific modifier
-func remove_modifier(modifier_name: String) -> void:
+func remove_modifier(modifier_name: String, source_id: String = "") -> void:
 	if not has_modifier(modifier_name):
 		return
 	
-	var modifier = _active_modifiers[modifier_name]
+	var value = _active_modifiers[modifier_name]
 	
-	# Let modules handle pre-removal
-	for module in _modules:
-		module.on_before_remove(modifier)
-	
-	modifier.delete()
-	_active_modifiers.erase(modifier_name)
-	
-	# Let modules handle post-removal
-	for module in _modules:
-		module.on_after_remove(modifier)
-	
-	modifier_removed.emit(modifier_name, modifier)
+	if value is Array:
+		var instances: Array = value
+		var to_remove_indices = []
+		
+		for i in range(instances.size()):
+			var inst = instances[i]
+			if source_id == "" or inst.stack_source_id == source_id:
+				for module in _modules:
+					module.on_before_remove(inst)
+				
+				to_remove_indices.append(i)
+		
+		# Remove in reverse order
+		to_remove_indices.reverse()
+		for i in to_remove_indices:
+			var inst = instances[i]
+			inst.uninit_modifiers()
+			instances.remove_at(i)
+			
+			for module in _modules:
+				module.on_after_remove(inst)
+			
+			modifier_removed.emit(modifier_name, inst)
+		
+		if instances.is_empty():
+			_active_modifiers.erase(modifier_name)
+	else:
+		var modifier = value
+		for module in _modules:
+			module.on_before_remove(modifier)
+		
+		modifier.uninit_modifiers()
+		_active_modifiers.erase(modifier_name)
+		
+		for module in _modules:
+			module.on_after_remove(modifier)
+		
+		modifier_removed.emit(modifier_name, modifier)
 
 ## Remove all modifiers in a specific group
 func remove_group_modifiers(group: String) -> void:
@@ -110,7 +158,18 @@ func clear_all_modifiers() -> void:
 
 ## Get active modifier by name
 func get_modifier(modifier_name: String) -> StatModifierSet:
-	return _active_modifiers.get(modifier_name)
+	var value = _active_modifiers.get(modifier_name)
+	if value is Array:
+		return value[0] if value.size() > 0 else null
+	return value
+
+func get_modifier_instances(modifier_name: String) -> Array:
+	var value = _active_modifiers.get(modifier_name)
+	if value is Array:
+		return value
+	elif value != null:
+		return [value]
+	return []
 
 ## Check if a modifier is currently active
 func has_modifier(modifier_name: String) -> bool:
@@ -119,36 +178,59 @@ func has_modifier(modifier_name: String) -> bool:
 ## Process method for updating modifiers
 func _process(delta: float) -> void:
 	# WARNING: Race condition possible if modules modify _active_modifiers during processing.
-    # If a module's process() or callbacks call apply_modifier() or remove_modifier(),
-    # this can modify the dictionary while we're iterating over it.
-    # Symptoms: Skipped modifiers, unexpected behavior, or crashes in rare cases.
-    # 
-    # Safe patterns:
-    # - Modules should queue changes and apply them after _process()
-    # - Or snapshot the keys before iteration (see fix below if needed)
-    #
-    # To fix: Use var modifier_names = _active_modifiers.keys() and iterate that instead
-    
+	# If a module's process() or callbacks call apply_modifier() or remove_modifier(),
+	# this can modify the dictionary while we're iterating over it.
+	# Symptoms: Skipped modifiers, unexpected behavior, or crashes in rare cases.
+	# 
+	# Safe patterns:
+	# - Modules should queue changes and apply them after _process()
+	# - Or snapshot the keys before iteration (see fix below if needed)
+	#
+	# To fix: Use var modifier_names = _active_modifiers.keys() and iterate that instead
+	
+	var modifier_names = _active_modifiers.keys()
 	var to_remove: Array = []
 	
-	# Update modifiers
-	for modifier_name in _active_modifiers:
-		var modifier = _active_modifiers[modifier_name]
-		if modifier.is_marked_for_deletion():
-			to_remove.append(modifier_name)
+	for modifier_name in modifier_names:
+		if not _active_modifiers.has(modifier_name):
 			continue
-		elif modifier.process:
-			modifier._process(delta)
+		
+		var value = _active_modifiers[modifier_name]
+		
+		if value is Array:
+			var instances: Array = value
+			for i in range(instances.size() - 1, -1, -1):
+				var inst = instances[i]
+				if inst.is_marked_for_deletion():
+					to_remove.append({"name": modifier_name, "index": i})
+				elif inst.process:
+					inst._process(delta)
+					if inst.is_marked_for_deletion():
+						to_remove.append({"name": modifier_name, "index": i})
+		else:
+			var modifier = value
 			if modifier.is_marked_for_deletion():
-				to_remove.append(modifier_name)
+				to_remove.append({"name": modifier_name})
+			elif modifier.process:
+				modifier._process(delta)
+				if modifier.is_marked_for_deletion():
+					to_remove.append({"name": modifier_name})
 	
-	# Update modules
 	for module in _modules:
 		module.process(delta)
 	
-	# Remove finished modifiers
-	for modifier_name in to_remove:
-		remove_modifier(modifier_name)
+	for item in to_remove:
+		var mod_name = item.get("name")
+		if item.has("index"):
+			var instances = _active_modifiers[mod_name]
+			var inst = instances[item["index"]]
+			inst.uninit_modifiers()
+			instances.remove_at(item["index"])
+			modifier_removed.emit(mod_name, inst)
+			if instances.is_empty():
+				_active_modifiers.erase(mod_name)
+		else:
+			remove_modifier(mod_name)
 
 ## Returns a dictionary representation of the buff manager's state
 func to_dict(modules: bool = false) -> Dictionary:

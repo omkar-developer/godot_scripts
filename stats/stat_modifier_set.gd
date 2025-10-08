@@ -29,6 +29,17 @@ signal on_effect_remove # Signal emitted when an effect is removed from a stat.
 ## remove as soon as applied (effect will not be removed)
 @export var consumable := false
 
+enum StackMode {
+	MERGE_VALUES,      # Combine values (default)
+	COUNT_STACKS,      # Track application count
+	INDEPENDENT,       # Separate instances
+}
+
+@export var stack_mode := StackMode.MERGE_VALUES
+@export var max_stacks := -1
+@export var stack_source_id := ""
+var stack_count := 1
+
 @export_group("Signal")
 @export var apply_on_signal := false
 @export var remove_on_signal := false
@@ -158,7 +169,7 @@ func _disconnect_condition() -> void:
 
 ## Merges a parallel StatModifierSet into this one.[br]
 ## [param modifer_set]: The StatModifierSet to merge.
-func _merge_parellel(modifer_set: StatModifierSet) -> void:
+func _merge_parallel(modifer_set: StatModifierSet) -> void:
 	if modifiers_count() != modifer_set.modifiers_count(): return
 	for i in range(modifer_set.modifiers_count() - 1, -1, -1):
 		if modifer_set._modifiers[i].is_equal(_modifiers[i]):
@@ -168,7 +179,19 @@ func _merge_parellel(modifer_set: StatModifierSet) -> void:
 ## [param mod]: The StatModifierSet to merge.
 func merge_mod(mod: StatModifierSet) -> void:
 	if not merge_enabled: return
-	_merge_parellel(mod)
+	
+	match stack_mode:
+		StackMode.MERGE_VALUES:
+			_merge_parallel(mod)
+		
+		StackMode.COUNT_STACKS:
+			if max_stacks > 0 and stack_count >= max_stacks:
+				return
+			stack_count += 1
+			_apply_effect()  # Reapply with new stack count
+		
+		StackMode.INDEPENDENT:
+			push_warning("merge_mod called on INDEPENDENT mode - should not happen")
 
 ## Sets the value of a modifier at a given index.[br]
 ## [param mod_idx]: The index of the modifier to set the value of.[br]
@@ -390,7 +413,11 @@ func to_dict() -> Dictionary:
 		"pause_on_apply_signal": pause_on_apply_signal,
 		"pause_on_remove_signal": pause_on_remove_signal,
 		"resume_on_apply_signal": resume_on_apply_signal,
-		"resume_on_remove_signal": resume_on_remove_signal
+		"resume_on_remove_signal": resume_on_remove_signal,
+		"stack_mode": stack_mode,
+		"max_stacks": max_stacks,
+		"stack_source_id": stack_source_id,
+		"stack_count": stack_count
 	}
 
 ## Loads this modifier set from a dictionary.
@@ -430,6 +457,11 @@ func from_dict(data: Dictionary, parent: Object = null) -> void:
 	pause_on_remove_signal = data.get("pause_on_remove_signal", false)
 	resume_on_apply_signal = data.get("resume_on_apply_signal", false)
 	resume_on_remove_signal = data.get("resume_on_remove_signal", false)
+
+	stack_mode = data.get("stack_mode", StackMode.MERGE_VALUES)
+	max_stacks = data.get("max_stacks", -1)
+	stack_source_id = data.get("stack_source_id", "")
+	stack_count = data.get("stack_count", 1)
 
 	_connect_signals()
 

@@ -471,3 +471,225 @@ func test_signals():
 	assert_true(removed_output["removed_emitted"], "removed signal should be emitted")
 	assert_eq(removed_output["removed_name"], "TestBuff", "removed signal should include modifier name")
 	assert_not_null(removed_output["removed_mod"], "removed signal should include modifier reference")
+
+
+## Test MERGE_VALUES stack mode (default behavior)
+func test_stack_mode_merge_values():
+	var buff_manager = autofree(BuffManager.new())
+	var parent = create_parent_with_stat({"Health": create_test_stat(100.0)})
+	buff_manager._parent = parent
+	
+	# Create modifier with MERGE_VALUES mode (default)
+	var mod_set1 = create_test_modifier_set("StrengthBuff")
+	mod_set1.stack_mode = StatModifierSet.StackMode.MERGE_VALUES
+	mod_set1.add_modifier(create_test_modifier("Health", StatModifier.StatModifierType.FLAT, 20.0))
+	
+	# Apply first time
+	buff_manager.apply_modifier(mod_set1)
+	assert_true(buff_manager.has_modifier("StrengthBuff"), "First modifier should be applied")
+	
+	# Apply second time with different value
+	var mod_set2 = create_test_modifier_set("StrengthBuff")
+	mod_set2.stack_mode = StatModifierSet.StackMode.MERGE_VALUES
+	mod_set2.add_modifier(create_test_modifier("Health", StatModifier.StatModifierType.FLAT, 30.0))
+	
+	buff_manager.apply_modifier(mod_set2)
+	
+	# Should only have ONE instance (merged)
+	var modifier = buff_manager.get_modifier("StrengthBuff")
+	assert_not_null(modifier, "Modifier should exist")
+	assert_false(buff_manager._active_modifiers["StrengthBuff"] is Array, "Should be single instance, not array")
+	
+	# Value should be merged (20 + 30 = 50)
+	var health_stat = parent.get_stat("Health")
+	assert_eq(health_stat.get_value(), 150.0, "Health should be 100 + 50 (merged)")
+
+## Test COUNT_STACKS mode
+func test_stack_mode_count_stacks():
+	var buff_manager = autofree(BuffManager.new())
+	var parent = create_parent_with_stat({"Health": create_test_stat(100.0)})
+	buff_manager._parent = parent
+	
+	# Create modifier with COUNT_STACKS mode
+	var mod_set = create_test_modifier_set("Poison")
+	mod_set.stack_mode = StatModifierSet.StackMode.COUNT_STACKS
+	mod_set.max_stacks = 3
+	mod_set.add_modifier(create_test_modifier("Health", StatModifier.StatModifierType.FLAT, -5.0))
+	
+	# Apply 3 times
+	buff_manager.apply_modifier(mod_set)
+	assert_eq(buff_manager.get_modifier("Poison").stack_count, 1, "Stack count should be 1")
+	
+	buff_manager.apply_modifier(mod_set)
+	assert_eq(buff_manager.get_modifier("Poison").stack_count, 2, "Stack count should be 2")
+	
+	buff_manager.apply_modifier(mod_set)
+	assert_eq(buff_manager.get_modifier("Poison").stack_count, 3, "Stack count should be 3")
+	
+	# Try to apply 4th time (should be rejected)
+	var result = buff_manager.apply_modifier(mod_set)
+	assert_false(result, "Should reject application when at max stacks")
+	assert_eq(buff_manager.get_modifier("Poison").stack_count, 3, "Stack count should stay at 3")
+	
+	# Should still be single instance
+	assert_false(buff_manager._active_modifiers["Poison"] is Array, "Should be single instance")
+
+## Test INDEPENDENT stack mode
+func test_stack_mode_independent():
+	var buff_manager = autofree(BuffManager.new())
+	var parent = create_parent_with_stat({"Health": create_test_stat(100.0)})
+	buff_manager._parent = parent
+	
+	# Create modifier with INDEPENDENT mode
+	var mod_set = create_test_modifier_set("Bleed")
+	mod_set.stack_mode = StatModifierSet.StackMode.INDEPENDENT
+	mod_set.add_modifier(create_test_modifier("Health", StatModifier.StatModifierType.FLAT, -10.0))
+	
+	# Apply 3 times
+	buff_manager.apply_modifier(mod_set)
+	buff_manager.apply_modifier(mod_set)
+	buff_manager.apply_modifier(mod_set)
+	
+	# Should have ARRAY with 3 instances
+	assert_true(buff_manager._active_modifiers["Bleed"] is Array, "Should be array for INDEPENDENT mode")
+	var instances = buff_manager.get_modifier_instances("Bleed")
+	assert_eq(instances.size(), 3, "Should have 3 independent instances")
+	
+	# Each instance should be separate
+	assert_ne(instances[0], instances[1], "Instances should be separate objects")
+	assert_ne(instances[1], instances[2], "Instances should be separate objects")
+	
+	# Health should have 3x effect
+	var health_stat = parent.get_stat("Health")
+	assert_eq(health_stat.get_value(), 70.0, "Health should be 100 - 30 (3 × -10)")
+	
+	# get_modifier() should return first instance
+	var modifier = buff_manager.get_modifier("Bleed")
+	assert_eq(modifier, instances[0], "get_modifier should return first instance")
+
+## Test INDEPENDENT mode with source_id
+func test_stack_mode_independent_with_source_id():
+	var buff_manager = autofree(BuffManager.new())
+	var parent = create_parent_with_stat({"Health": create_test_stat(100.0)})
+	buff_manager._parent = parent
+	
+	# Apply poison from attacker 1 (twice)
+	var poison1 = create_test_modifier_set("Poison")
+	poison1.stack_mode = StatModifierSet.StackMode.INDEPENDENT
+	poison1.stack_source_id = "attacker_1"
+	poison1.add_modifier(create_test_modifier("Health", StatModifier.StatModifierType.FLAT, -5.0))
+	
+	buff_manager.apply_modifier(poison1)
+	buff_manager.apply_modifier(poison1)
+	
+	# Apply poison from attacker 2 (once)
+	var poison2 = create_test_modifier_set("Poison")
+	poison2.stack_mode = StatModifierSet.StackMode.INDEPENDENT
+	poison2.stack_source_id = "attacker_2"
+	poison2.add_modifier(create_test_modifier("Health", StatModifier.StatModifierType.FLAT, -5.0))
+	
+	buff_manager.apply_modifier(poison2)
+	
+	# Should have 3 total instances
+	var instances = buff_manager.get_modifier_instances("Poison")
+	assert_eq(instances.size(), 3, "Should have 3 poison instances")
+	
+	# Health should have 3x effect
+	var health_stat = parent.get_stat("Health")
+	assert_eq(health_stat.get_value(), 85.0, "Health should be 100 - 15 (3 x -5)")
+	
+	# Remove only attacker_1's poison
+	buff_manager.remove_modifier("Poison", "attacker_1")
+	
+	# Should have 1 instance left (from attacker_2)
+	instances = buff_manager.get_modifier_instances("Poison")
+	assert_eq(instances.size(), 1, "Should have 1 poison instance left")
+	assert_eq(instances[0].stack_source_id, "attacker_2", "Remaining instance should be from attacker_2")
+	
+	# Health should have 1x effect now
+	assert_eq(health_stat.get_value(), 95.0, "Health should be 100 - 5 (1 × -5)")
+
+## Test INDEPENDENT mode with per-source limit
+func test_stack_mode_independent_per_source_limit():
+	var buff_manager = autofree(BuffManager.new())
+	var parent = create_parent_with_stat({"Health": create_test_stat(100.0)})
+	buff_manager._parent = parent
+	
+	# Create modifier with source limit
+	var poison = create_test_modifier_set("Poison")
+	poison.stack_mode = StatModifierSet.StackMode.INDEPENDENT
+	poison.stack_source_id = "player1"
+	poison.max_stacks = 2
+	poison.add_modifier(create_test_modifier("Health", StatModifier.StatModifierType.FLAT, -5.0))
+	
+	# Apply 3 times (should only apply 2)
+	var result1 = buff_manager.apply_modifier(poison)
+	var result2 = buff_manager.apply_modifier(poison)
+	var result3 = buff_manager.apply_modifier(poison)
+	
+	assert_true(result1, "First application should succeed")
+	assert_true(result2, "Second application should succeed")
+	assert_false(result3, "Third application should be rejected (at source limit)")
+	
+	# Should have only 2 instances
+	var instances = buff_manager.get_modifier_instances("Poison")
+	assert_eq(instances.size(), 2, "Should have 2 instances (source limit)")
+	
+	# Health should have 2x effect
+	var health_stat = parent.get_stat("Health")
+	assert_eq(health_stat.get_value(), 90.0, "Health should be 100 - 10 (2 × -5)")
+
+## Test get_modifier with array returns first instance
+func test_get_modifier_with_array():
+	var buff_manager = autofree(BuffManager.new())
+	var parent = create_parent_with_stat({"Health": create_test_stat(100.0)})
+	buff_manager._parent = parent
+	
+	var mod_set = create_test_modifier_set("Burn")
+	mod_set.stack_mode = StatModifierSet.StackMode.INDEPENDENT
+	mod_set.add_modifier(create_test_modifier("Health", StatModifier.StatModifierType.FLAT, -3.0))
+	
+	buff_manager.apply_modifier(mod_set)
+	buff_manager.apply_modifier(mod_set)
+	
+	var instances = buff_manager.get_modifier_instances("Burn")
+	var first_modifier = buff_manager.get_modifier("Burn")
+	
+	assert_eq(first_modifier, instances[0], "get_modifier should return first instance for INDEPENDENT mode")
+	assert_not_null(first_modifier, "get_modifier should not return null")
+
+## Test serialization with stacks
+func test_serialization_with_stacks():
+	var buff_manager = autofree(BuffManager.new())
+	var parent = create_parent_with_stat({"Health": create_test_stat(100.0)})
+	buff_manager._parent = parent
+	
+	# Apply INDEPENDENT modifiers
+	var bleed = create_test_modifier_set("Bleed")
+	bleed.stack_mode = StatModifierSet.StackMode.INDEPENDENT
+	bleed.stack_source_id = "enemy1"
+	bleed.add_modifier(create_test_modifier("Health", StatModifier.StatModifierType.FLAT, -5.0))
+	
+	buff_manager.apply_modifier(bleed)
+	buff_manager.apply_modifier(bleed)
+	
+	# Apply COUNT_STACKS modifier
+	var poison = create_test_modifier_set("Poison")
+	poison.stack_mode = StatModifierSet.StackMode.COUNT_STACKS
+	poison.max_stacks = 5
+	poison.add_modifier(create_test_modifier("Health", StatModifier.StatModifierType.FLAT, -2.0))
+	
+	buff_manager.apply_modifier(poison)
+	buff_manager.apply_modifier(poison)
+	buff_manager.apply_modifier(poison)
+	
+	# Serialize
+	var data = buff_manager.to_dict()
+	
+	# Clear and restore
+	buff_manager.clear_all_modifiers()
+	assert_eq(buff_manager._active_modifiers.size(), 0, "Should be empty after clear")
+	
+	buff_manager.from_dict(data)
+	
+	# Verify INDEPENDENT
