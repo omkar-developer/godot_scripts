@@ -88,8 +88,8 @@ func _init(modifier_name := "", _process_every_frame := false, group := "", _app
 
 ## Merges another modifier set into this one.[br]
 ## [param mod]: The modifier set to merge.
-func merge_mod(mod: StatModifierSet) -> void:
-	if not merge_enabled or merge_type == MergeType.NONE: return
+func merge_mod(mod: StatModifierSet) -> bool:
+	if not merge_enabled or merge_type == MergeType.NONE: return false
 	if mod is StatModifierSetTimed:
 		if merge_type & MergeType.ADD_VALUE:
 			super.merge_mod(mod)
@@ -111,7 +111,8 @@ func merge_mod(mod: StatModifierSet) -> void:
 	else:
 		# For non-timed modifiers, just use the parent implementation for values
 		if merge_type & MergeType.ADD_VALUE:
-			super.merge_mod(mod)
+			return super.merge_mod(mod)
+	return true
 
 ## Process method called every frame when processing is enabled.[br]
 ## [param _delta]: Time since last frame.
@@ -143,6 +144,18 @@ func _process(_delta: float) -> void:
 		if timer >= duration:
 			timer = 0.0
 			delete()
+
+## Returns the remaining time in seconds (0 if finished or unlimited)
+func get_remaining_time() -> float:
+	if duration <= 0:
+		return duration  # unlimited
+	return max(duration - timer, 0.0)
+
+## Returns remaining time as fraction [0..1] for UI bars
+func get_remaining_fraction() -> float:
+	if duration <= 0:
+		return 1.0
+	return clamp((duration - timer) / duration, 0.0, 1.0)
 
 ## Creates a copy of this timed modifier set.[br]
 ## [return]: A new StatModifierSetTimed with the same properties.

@@ -593,7 +593,7 @@ func test_merge_mod():
 	mod_set2._modifiers.append(_create_test_modifier("Health", StatModifierClassScript.StatModifierType.FLAT, 25.0))
 	
 	# Test merging
-	mod_set1._merge_parellel(mod_set2)
+	mod_set1._merge_parallel(mod_set2)
 	
 	# Check if modifiers merged correctly
 	assert_eq(mod_set1._modifiers[0].get_value(), 75.0, "Modifier values should be merged")

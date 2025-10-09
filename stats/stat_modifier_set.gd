@@ -177,21 +177,26 @@ func _merge_parallel(modifer_set: StatModifierSet) -> void:
 
 ## Merges a StatModifierSet into this one.[br]
 ## [param mod]: The StatModifierSet to merge.
-func merge_mod(mod: StatModifierSet) -> void:
-	if not merge_enabled: return
+func merge_mod(mod: StatModifierSet) -> bool:
+	if not merge_enabled: return false
 	
 	match stack_mode:
 		StackMode.MERGE_VALUES:
 			_merge_parallel(mod)
+			return true
 		
 		StackMode.COUNT_STACKS:
 			if max_stacks > 0 and stack_count >= max_stacks:
-				return
+				return false
 			stack_count += 1
-			_apply_effect()  # Reapply with new stack count
+			_apply_effect()
+			return true
 		
 		StackMode.INDEPENDENT:
 			push_warning("merge_mod called on INDEPENDENT mode - should not happen")
+			return false
+	
+	return false
 
 ## Sets the value of a modifier at a given index.[br]
 ## [param mod_idx]: The index of the modifier to set the value of.[br]
@@ -374,6 +379,10 @@ func copy() -> StatModifierSet:
 	mod_set.pause_on_remove_signal = pause_on_remove_signal
 	mod_set.resume_on_apply_signal = resume_on_apply_signal
 	mod_set.resume_on_remove_signal = resume_on_remove_signal
+	mod_set.stack_mode = stack_mode
+	mod_set.max_stacks = max_stacks
+	mod_set.stack_count = stack_count
+	mod_set.stack_source_id = stack_source_id
 	
 	return mod_set
 

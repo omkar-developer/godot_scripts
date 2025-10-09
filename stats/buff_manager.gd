@@ -68,7 +68,8 @@ func apply_modifier(_modifier: StatModifierSet, copy: bool = true) -> bool:
 		
 		_:  # All other modes
 			if has_modifier(modifier_name):
-				_active_modifiers[modifier_name].merge_mod(modifier)
+				if not _active_modifiers[modifier_name].merge_mod(modifier):
+					return false
 			else:
 				modifier.init_modifiers(_parent)
 				_active_modifiers[modifier_name] = modifier
@@ -129,7 +130,13 @@ func remove_modifier(modifier_name: String, source_id: String = "") -> void:
 func remove_group_modifiers(group: String) -> void:
 	var to_remove = []
 	for modifier_name in _active_modifiers:
-		if _active_modifiers[modifier_name]._group == group:
+		var value = _active_modifiers[modifier_name]
+		if value is Array:
+			for inst in value:
+				if inst._group == group:
+					to_remove.append(modifier_name)
+					break
+		elif value._group == group:
 			to_remove.append(modifier_name)
 	
 	for modifier_name in to_remove:
@@ -138,15 +145,23 @@ func remove_group_modifiers(group: String) -> void:
 ## Get all active modifiers in a specific group
 func get_group_modifiers(group: String) -> Array[StatModifierSet]:
 	var modifiers: Array[StatModifierSet] = []
-	for modifier in _active_modifiers.values():
-		if modifier._group == group:
-			modifiers.append(modifier)
+	for value in _active_modifiers.values():
+		if value is Array:
+			for inst in value:
+				if inst._group == group:
+					modifiers.append(inst)
+		elif value._group == group:
+			modifiers.append(value)
 	return modifiers
 
 ## Check if a group has any active modifiers
 func has_group_modifiers(group: String) -> bool:
-	for modifier in _active_modifiers.values():
-		if modifier._group == group:
+	for value in _active_modifiers.values():
+		if value is Array:
+			for inst in value:
+				if inst._group == group:
+					return true
+		elif value._group == group:
 			return true
 	return false
 
@@ -163,17 +178,114 @@ func get_modifier(modifier_name: String) -> StatModifierSet:
 		return value[0] if value.size() > 0 else null
 	return value
 
-func get_modifier_instances(modifier_name: String) -> Array:
-	var value = _active_modifiers.get(modifier_name)
-	if value is Array:
-		return value
-	elif value != null:
-		return [value]
-	return []
-
 ## Check if a modifier is currently active
 func has_modifier(modifier_name: String) -> bool:
 	return _active_modifiers.has(modifier_name)
+
+## Get the effective stack count for a modifier
+func get_effective_stack_count(modifier_name: String) -> int:
+	var value = _active_modifiers.get(modifier_name)
+	if value is Array:
+		return value.size()
+	elif value != null and value.has("stack_count"):
+		return value.stack_count
+	return 1
+
+## Get the current stack count for a modifier (for COUNT_STACKS mode)
+func get_stack_count(modifier_name: String) -> int:
+	if not has_modifier(modifier_name):
+		return 0
+	
+	var value = _active_modifiers.get(modifier_name)
+	
+	# If it's COUNT_STACKS mode
+	if value is StatModifierSet and value.stack_mode == StatModifierSet.StackMode.COUNT_STACKS:
+		return value.stack_count
+	
+	# INDEPENDENT mode uses instances instead of a numeric stack count
+	if value is Array:
+		return value.size()
+	
+	# Default (MERGE_VALUES, etc.)
+	return 1
+
+## Get the current instance count for a modifier
+func get_instances_count(modifier_name: String) -> int:
+	if not has_modifier(modifier_name):
+		return 0
+	
+	var value = _active_modifiers.get(modifier_name)
+	if value is Array:
+		return value.size()
+
+	return 1
+
+## Get all instances of a modifier (useful for INDEPENDENT mode)
+func get_modifier_instances(modifier_name: String) -> Array[StatModifierSet]:
+	var result: Array[StatModifierSet] = []
+	var value = _active_modifiers.get(modifier_name)
+	
+	if value is Array:
+		for inst in value:
+			result.append(inst)
+	elif value != null:
+		result.append(value)
+	
+	return result
+
+## Check if we can apply more stacks of a modifier
+func can_apply_more_stacks(modifier_name: String, source_id: String = "") -> bool:
+	if not has_modifier(modifier_name):
+		return true
+	
+	var value = _active_modifiers.get(modifier_name)
+	
+	if value is Array:
+		# INDEPENDENT mode - check source limits
+		var first_inst = value[0] if value.size() > 0 else null
+		if first_inst == null:
+			return true
+		
+		if source_id != "" and first_inst.max_stacks > 0:
+			var source_count = 0
+			for inst in value:
+				if inst.stack_source_id == source_id:
+					source_count += 1
+			return source_count < first_inst.max_stacks
+		return true
+	else:
+		# COUNT_STACKS or other modes
+		if value.max_stacks > 0:
+			return value.stack_count < value.max_stacks
+		return true
+
+## Remove a single stack from COUNT_STACKS modifier
+func remove_stack(modifier_name: String, count: int = 1) -> bool:
+	if not has_modifier(modifier_name):
+		return false
+	
+	var value = _active_modifiers.get(modifier_name)
+	if value is Array or value.stack_mode != StatModifierSet.StackMode.COUNT_STACKS:
+		push_warning("remove_stack only works with COUNT_STACKS mode")
+		return false
+	
+	value.stack_count = max(0, value.stack_count - count)
+	if value.stack_count <= 0:
+		remove_modifier(modifier_name)
+		return true
+	
+	value._apply_effect()  # Reapply with reduced stacks
+	return true
+
+## Get total number of active modifier instances (across all names)
+func get_total_modifier_count() -> int:
+	var count = 0
+	for value in _active_modifiers.values():
+		if value is Array:
+			count += value.size()
+		else:
+			count += 1
+	return count
 
 ## Process method for updating modifiers
 func _process(delta: float) -> void:
@@ -234,16 +346,29 @@ func _process(delta: float) -> void:
 
 ## Returns a dictionary representation of the buff manager's state
 func to_dict(modules: bool = false) -> Dictionary:
+	var modifiers_data = []
+	
+	for key in _active_modifiers.keys():
+		var value = _active_modifiers[key]
+		
+		if value is Array:
+			# Handle array of modifiers (INDEPENDENT stack mode)
+			for inst in value:
+				modifiers_data.append({
+					"key": key,
+					"class_type": inst.get_script().get_global_name(),
+					"data": inst.to_dict()
+				})
+		else:
+			# Handle single modifier
+			modifiers_data.append({
+				"key": key,
+				"class_type": value.get_script().get_global_name(),
+				"data": value.to_dict()
+			})
+	
 	return {
-		"active_modifiers": _active_modifiers.keys().map(
-		func(key): 
-		var modifier = _active_modifiers[key]
-		return {
-			"key": key,
-			"class_type": modifier.get_script().get_global_name(),
-			"data": modifier.to_dict()
-		}
-		),
+		"active_modifiers": modifiers_data,
 		"modules": _modules.map(
 		func(module): 
 		return {
@@ -261,19 +386,19 @@ func from_dict(data: Dictionary, modules: bool = false) -> void:
 	clear_all_modifiers()
 	_modules.clear()
 	
-	# Load modifiers
+	# Load modules FIRST so they can intercept modifier loading
+	if modules and not data.get("modules", []).is_empty():
+		for module_data in data.get("modules", []):
+			var module = _instantiate_class(module_data.get("class_type", ""))
+			if module:
+				module.from_dict(module_data["data"])
+				add_module(module)
+	
 	for mod_data in data.get("active_modifiers", []):
 		var modifier = _instantiate_class(mod_data.get("class_type", ""))
-		modifier.from_dict(mod_data["data"])
-		apply_modifier(modifier, false)  # false to not copy since we just created it
-	
-	# Load modules
-	if not modules or data.get("modules", []).is_empty(): return
-	for module_data in data.get("modules", []):
-		var module = _instantiate_class(module_data.get("class_type", ""))
-		if module:
-			module.from_dict(module_data["data"])
-			add_module(module)
+		if modifier:
+			modifier.from_dict(mod_data["data"])
+			apply_modifier(modifier, false)
 
 func _instantiate_class(class_type: String) -> Object:
 	var global_classes = ProjectSettings.get_global_class_list()

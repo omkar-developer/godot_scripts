@@ -557,9 +557,10 @@ func test_stack_mode_independent():
 	var instances = buff_manager.get_modifier_instances("Bleed")
 	assert_eq(instances.size(), 3, "Should have 3 independent instances")
 	
+	if instances.size() == 3:
 	# Each instance should be separate
-	assert_ne(instances[0], instances[1], "Instances should be separate objects")
-	assert_ne(instances[1], instances[2], "Instances should be separate objects")
+		assert_ne(instances[0], instances[1], "Instances should be separate objects")
+		assert_ne(instances[1], instances[2], "Instances should be separate objects")
 	
 	# Health should have 3x effect
 	var health_stat = parent.get_stat("Health")
@@ -695,3 +696,128 @@ func test_serialization_with_stacks():
 	buff_manager.from_dict(data)
 	
 	# Verify INDEPENDENT
+	
+# Test: Mixed stack modes
+func test_mixed_stack_modes():
+	var buff_manager = autofree(BuffManager.new())
+	var parent = create_parent_with_stat({"Health": create_test_stat(100.0)})
+	buff_manager._parent = parent
+	
+	# Apply different modifiers with different stack modes
+	var poison = create_test_modifier_set("Poison")
+	poison.stack_mode = StatModifierSet.StackMode.COUNT_STACKS
+	poison.max_stacks = 3
+	
+	var shield = create_test_modifier_set("Shield")
+	shield.stack_mode = StatModifierSet.StackMode.INDEPENDENT
+	shield.stack_source_id = "player1"
+	
+	var buff = create_test_modifier_set("Buff")
+	buff.stack_mode = StatModifierSet.StackMode.MERGE_VALUES
+	
+	assert_true(buff_manager.apply_modifier(poison))
+	assert_true(buff_manager.apply_modifier(shield))
+	assert_true(buff_manager.apply_modifier(buff))
+	
+	assert_eq(buff_manager.get_total_modifier_count(), 3)
+
+# Test: Stack removal for INDEPENDENT mode
+func test_remove_independent_stack_by_source():
+	var buff_manager = autofree(BuffManager.new())
+	var parent = create_parent_with_stat({"Health": create_test_stat(100.0)})
+	buff_manager._parent = parent
+	
+	var mod = create_test_modifier_set("Poison")
+	mod.stack_mode = StatModifierSet.StackMode.INDEPENDENT
+	
+	var mod1 = mod.copy()
+	mod1.stack_source_id = "enemy1"
+	var mod2 = mod.copy()
+	mod2.stack_source_id = "enemy2"
+	var mod3 = mod.copy()
+	mod3.stack_source_id = "enemy1"
+	
+	buff_manager.apply_modifier(mod1, false)
+	buff_manager.apply_modifier(mod2, false)
+	buff_manager.apply_modifier(mod3, false)
+	
+	assert_eq(buff_manager.get_stack_count("Poison"), 3)
+	
+	# Remove only enemy1's stacks
+	buff_manager.remove_modifier("Poison", "enemy1")
+	assert_eq(buff_manager.get_stack_count("Poison"), 1)
+	assert_true(buff_manager.has_modifier("Poison"))
+
+# Test: Helper functions
+func test_helper_functions():
+	var buff_manager = autofree(BuffManager.new())
+	var parent = create_parent_with_stat({"Health": create_test_stat(100.0)})
+	buff_manager._parent = parent
+	
+	var mod = create_test_modifier_set("Poison")
+	mod.stack_mode = StatModifierSet.StackMode.COUNT_STACKS
+	mod.max_stacks = 3
+	
+	assert_true(buff_manager.can_apply_more_stacks("Poison"))
+	buff_manager.apply_modifier(mod)
+	assert_eq(buff_manager.get_stack_count("Poison"), 1)
+	
+	buff_manager.apply_modifier(mod)
+	buff_manager.apply_modifier(mod)
+	assert_eq(buff_manager.get_stack_count("Poison"), 3)
+	assert_false(buff_manager.can_apply_more_stacks("Poison"))
+	
+	buff_manager.remove_stack("Poison", 2)
+	assert_eq(buff_manager.get_stack_count("Poison"), 1)
+	assert_true(buff_manager.can_apply_more_stacks("Poison"))
+
+# Test: Serialization preserves stack modes correctly
+func test_serialization_preserves_independent_stacks():
+	var buff_manager = autofree(BuffManager.new())
+	var parent = create_parent_with_stat({"Health": create_test_stat(100.0)})
+	buff_manager._parent = parent
+	
+	var mod = create_test_modifier_set("Poison")
+	mod.stack_mode = StatModifierSet.StackMode.INDEPENDENT
+	mod.stack_source_id = "enemy1"
+	
+	buff_manager.apply_modifier(mod)
+	buff_manager.apply_modifier(mod.copy())
+	buff_manager.apply_modifier(mod.copy())
+	
+	var data = buff_manager.to_dict()
+	assert_eq(data["active_modifiers"].size(), 3, "Should have 3 separate entries")
+	
+	var new_manager = autofree(BuffManager.new())
+	new_manager._parent = parent
+	new_manager.from_dict(data)
+	
+	assert_eq(new_manager.get_stack_count("Poison"), 3)
+
+# Test: Group operations with different stack modes
+func test_group_operations_with_stacks():
+	var buff_manager = autofree(BuffManager.new())
+	var parent = create_parent_with_stat({"Health": create_test_stat(100.0)})
+	buff_manager._parent = parent
+	
+	var poison1 = create_test_modifier_set("Poison")
+	poison1._group = "debuffs"
+	poison1.stack_mode = StatModifierSet.StackMode.INDEPENDENT
+	poison1.stack_source_id = "source1"
+	
+	var poison2 = poison1.copy()
+	poison2.stack_source_id = "source2"
+	
+	var buff = create_test_modifier_set("Buff")
+	buff._group = "buffs"
+	
+	buff_manager.apply_modifier(poison1, false)
+	buff_manager.apply_modifier(poison2, false)
+	buff_manager.apply_modifier(buff)
+	
+	var debuffs = buff_manager.get_group_modifiers("debuffs")
+	assert_eq(debuffs.size(), 2, "Should get both poison instances")
+	
+	buff_manager.remove_group_modifiers("debuffs")
+	assert_false(buff_manager.has_modifier("Poison"))
+	assert_true(buff_manager.has_modifier("Buff"))
