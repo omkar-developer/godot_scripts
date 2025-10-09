@@ -62,6 +62,16 @@ var stack_count := 1
 ## pause process when condition is false and vice versa
 @export var _condition_pause_process := false
 
+## Stack decay settings
+@export var enable_stack_decay: bool = false
+@export var stack_decay_interval: float = 1.0  # Seconds between decay ticks
+@export var stack_decay_amount: int = 1  # Stacks to remove per tick (-1 = remove all)
+@export var stack_decay_min: int = 0  # Minimum stacks (usually 0, but can be higher)
+@export var refresh_decay_on_stack: bool = false  # Reset timer when new stack added
+@export var remove_on_zero_stacks: bool = true  # Delete modifier when stacks reach min
+
+@export_storage var _stack_decay_timer: float = 0.0
+
 var _marked_for_deletion := false
 
 ## The _parent object associated with this modifier set.
@@ -189,6 +199,11 @@ func merge_mod(mod: StatModifierSet) -> bool:
 			if max_stacks > 0 and stack_count >= max_stacks:
 				return false
 			stack_count += 1
+			
+			# Refresh decay timer if enabled
+			if refresh_decay_on_stack and enable_stack_decay:
+				_stack_decay_timer = 0.0
+			
 			_apply_effect()
 			return true
 		
@@ -248,6 +263,18 @@ func _apply_effect() -> void:
 func _remove_effect() -> void:
 	for mod in _modifiers:
 		mod.remove()
+	on_effect_remove.emit()
+
+## Removes a given number of stacks from all _modifiers in this set.
+func _remove_stack_effect(stack_count_to_remove: int = 1) -> void:
+	if stack_count_to_remove <= 0:
+		return
+
+	for mod in _modifiers:
+		if mod.is_valid():
+			for i in stack_count_to_remove:
+				mod.remove(false)  # remove one stack worth of value each time
+
 	on_effect_remove.emit()
 
 ## Initializes all _modifiers in this set with the given _parent.[br]
@@ -339,6 +366,33 @@ func clear_all() -> void:
 func _process(delta: float) -> void:
 	if condition != null:
 		condition._process(delta)
+
+	if enable_stack_decay and stack_mode == StackMode.COUNT_STACKS:
+		_stack_decay_timer += delta
+
+		if _stack_decay_timer >= stack_decay_interval:
+			# Calculate how many decay ticks should happen
+			var ticks_to_apply = int(_stack_decay_timer / stack_decay_interval)
+			_stack_decay_timer -= ticks_to_apply * stack_decay_interval
+
+			# Reduce stacks accordingly
+			var total_decay = stack_decay_amount * ticks_to_apply
+			if stack_decay_amount == -1:
+				stack_count = stack_decay_min
+			else:
+				stack_count = max(stack_decay_min, stack_count - total_decay)
+
+			# Remove effect entirely if below threshold
+			if stack_count <= stack_decay_min:
+				if remove_on_zero_stacks:
+					delete()
+					return
+				# else keep the remaining stacks and leftover timer
+
+			else:
+				# Apply reduced effect for each tick (if needed)
+				for _i in range(ticks_to_apply):
+					_remove_stack_effect()
 	
 ## Deletes this modifier set.
 func delete() -> void:
@@ -383,6 +437,13 @@ func copy() -> StatModifierSet:
 	mod_set.max_stacks = max_stacks
 	mod_set.stack_count = stack_count
 	mod_set.stack_source_id = stack_source_id
+	mod_set.enable_stack_decay = enable_stack_decay
+	mod_set.stack_decay_interval = stack_decay_interval
+	mod_set.stack_decay_amount = stack_decay_amount
+	mod_set.stack_decay_min = stack_decay_min
+	mod_set.refresh_decay_on_stack = refresh_decay_on_stack
+	mod_set.remove_on_zero_stacks = remove_on_zero_stacks
+	mod_set._stack_decay_timer = _stack_decay_timer
 	
 	return mod_set
 
@@ -426,7 +487,14 @@ func to_dict() -> Dictionary:
 		"stack_mode": stack_mode,
 		"max_stacks": max_stacks,
 		"stack_source_id": stack_source_id,
-		"stack_count": stack_count
+		"stack_count": stack_count,
+		"enable_stack_decay": enable_stack_decay,
+		"stack_decay_interval": stack_decay_interval,
+		"stack_decay_amount": stack_decay_amount,
+		"stack_decay_min": stack_decay_min,
+		"refresh_decay_on_stack": refresh_decay_on_stack,
+		"remove_on_zero_stacks": remove_on_zero_stacks,
+		"stack_decay_timer": _stack_decay_timer
 	}
 
 ## Loads this modifier set from a dictionary.
@@ -471,6 +539,14 @@ func from_dict(data: Dictionary, parent: Object = null) -> void:
 	max_stacks = data.get("max_stacks", -1)
 	stack_source_id = data.get("stack_source_id", "")
 	stack_count = data.get("stack_count", 1)
+	
+	enable_stack_decay = data.get("enable_stack_decay", false)
+	stack_decay_interval = data.get("stack_decay_interval", 1.0)
+	stack_decay_amount = data.get("stack_decay_amount", 1)
+	stack_decay_min = data.get("stack_decay_min", 0)
+	refresh_decay_on_stack = data.get("refresh_decay_on_stack", false)
+	remove_on_zero_stacks = data.get("remove_on_zero_stacks", true)
+	_stack_decay_timer = data.get("stack_decay_timer", 0.0)
 
 	_connect_signals()
 

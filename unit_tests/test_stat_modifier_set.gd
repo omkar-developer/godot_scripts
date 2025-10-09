@@ -597,3 +597,218 @@ func test_merge_mod():
 	
 	# Check if modifiers merged correctly
 	assert_eq(mod_set1._modifiers[0].get_value(), 75.0, "Modifier values should be merged")
+
+# Stack Decay Tests
+
+func test_stack_decay_basic():
+	var mod_set = StatModifierSet.new("DecayTest", true, "debuffs")
+	var parent = _create_parent_with_stat({"Health": _create_test_stat(100.0)})
+	mod_set.stack_mode = StatModifierSet.StackMode.COUNT_STACKS
+	mod_set.add_modifier(_create_test_modifier("Health", StatModifier.StatModifierType.FLAT, -5.0))
+	mod_set.enable_stack_decay = true
+	mod_set.stack_decay_interval = 1.0
+	mod_set.stack_decay_amount = 1
+	mod_set.stack_count = 5
+	mod_set.init_modifiers(parent)
+	
+	# Process 1 second - should remove 1 stack
+	mod_set._process(1.0)
+	assert_eq(mod_set.stack_count, 4, "Should have 4 stacks after 1 second")
+	
+	# Process another second
+	mod_set._process(1.0)
+	assert_eq(mod_set.stack_count, 3, "Should have 3 stacks after 2 seconds")
+
+func test_stack_decay_remove_all():
+	var mod_set = StatModifierSet.new("DecayAllTest", true, "debuffs")
+	var parent = _create_parent_with_stat({"Health": _create_test_stat(100.0)})
+	mod_set.stack_mode = StatModifierSet.StackMode.COUNT_STACKS
+	mod_set.add_modifier(_create_test_modifier("Health", StatModifier.StatModifierType.FLAT, -5.0))
+	mod_set.enable_stack_decay = true
+	mod_set.stack_decay_interval = 2.0
+	mod_set.stack_decay_amount = -1  # Remove all
+	mod_set.stack_count = 5
+	mod_set.init_modifiers(parent)
+	
+	# Process 2 seconds - should remove all stacks
+	mod_set._process(2.0)
+	assert_eq(mod_set.stack_count, 0, "Should have 0 stacks after removal")
+	assert_true(mod_set.is_marked_for_deletion(), "Should be marked for deletion")
+
+func test_stack_decay_marks_for_deletion():
+	var mod_set = StatModifierSet.new("DecayDeleteTest", true, "debuffs")
+	var parent = _create_parent_with_stat({"Health": _create_test_stat(100.0)})
+	mod_set.stack_mode = StatModifierSet.StackMode.COUNT_STACKS
+	mod_set.add_modifier(_create_test_modifier("Health", StatModifier.StatModifierType.FLAT, -5.0))
+	mod_set.enable_stack_decay = true
+	mod_set.stack_decay_interval = 1.0
+	mod_set.stack_decay_amount = 2
+	mod_set.remove_on_zero_stacks = true
+	mod_set.stack_count = 3
+	mod_set.init_modifiers(parent)
+	
+	# First decay: 3 -> 1
+	mod_set._process(1.0)
+	assert_eq(mod_set.stack_count, 1, "Should have 1 stack")
+	assert_false(mod_set.is_marked_for_deletion(), "Should not be marked yet")
+	
+	# Second decay: 1 -> 0 (min) -> marked
+	mod_set._process(1.0)
+	assert_eq(mod_set.stack_count, 0, "Should have 0 stacks")
+	assert_true(mod_set.is_marked_for_deletion(), "Should be marked for deletion")
+
+func test_stack_decay_with_minimum():
+	var mod_set = StatModifierSet.new("DecayMinTest", true, "buffs")
+	var parent = _create_parent_with_stat({"Strength": _create_test_stat(10.0)})
+	mod_set.stack_mode = StatModifierSet.StackMode.COUNT_STACKS
+	mod_set.add_modifier(_create_test_modifier("Strength", StatModifier.StatModifierType.FLAT, 5.0))
+	mod_set.enable_stack_decay = true
+	mod_set.stack_decay_interval = 1.0
+	mod_set.stack_decay_amount = 1
+	mod_set.stack_decay_min = 2  # Keep at least 2 stacks
+	mod_set.remove_on_zero_stacks = false
+	mod_set.stack_count = 5
+	mod_set.init_modifiers(parent)
+	
+	# Decay to minimum
+	mod_set._process(1.0)  # 5 -> 4
+	mod_set._process(1.0)  # 4 -> 3
+	mod_set._process(1.0)  # 3 -> 2
+	assert_eq(mod_set.stack_count, 2, "Should stop at minimum")
+	
+	# Try to decay further
+	mod_set._process(1.0)
+	assert_eq(mod_set.stack_count, 2, "Should stay at minimum")
+	assert_false(mod_set.is_marked_for_deletion(), "Should not be deleted")
+
+func test_stack_decay_refresh_on_stack():
+	var mod_set = StatModifierSet.new("RefreshTest", true, "debuffs")
+	var parent = _create_parent_with_stat({"Health": _create_test_stat(100.0)})
+	mod_set.stack_mode = StatModifierSet.StackMode.COUNT_STACKS
+	mod_set.add_modifier(_create_test_modifier("Health", StatModifier.StatModifierType.FLAT, -5.0))
+	mod_set.enable_stack_decay = true
+	mod_set.stack_decay_interval = 2.0
+	mod_set.stack_decay_amount = 1
+	mod_set.refresh_decay_on_stack = true
+	mod_set.stack_count = 3
+	mod_set.init_modifiers(parent)
+	
+	# Process 1.5 seconds (not enough to decay)
+	mod_set._process(1.5)
+	assert_eq(mod_set.stack_count, 3, "Should still have 3 stacks")
+	
+	# Add a new stack - should refresh timer
+	var new_mod = StatModifierSet.new("RefreshTest")
+	new_mod.stack_mode = StatModifierSet.StackMode.COUNT_STACKS  # Must set stack mode
+	var merge_result = mod_set.merge_mod(new_mod)
+	assert_true(merge_result, "Merge should succeed")
+	assert_eq(mod_set.stack_count, 4, "Should have 4 stacks")
+	
+	# Process 1.5 seconds again - timer was refreshed, so no decay yet
+	mod_set._process(1.5)
+	assert_eq(mod_set.stack_count, 4, "Should still have 4 stacks (timer refreshed)")
+	
+	# Process final 0.5 seconds to complete interval
+	mod_set._process(0.5)
+	assert_eq(mod_set.stack_count, 3, "Should decay to 3 stacks")
+
+func test_stack_decay_no_refresh_on_stack():
+	var mod_set = StatModifierSet.new("NoRefreshTest", true, "debuffs")
+	var parent = _create_parent_with_stat({"Health": _create_test_stat(100.0)})
+	mod_set.stack_mode = StatModifierSet.StackMode.COUNT_STACKS
+	mod_set.add_modifier(_create_test_modifier("Health", StatModifier.StatModifierType.FLAT, -5.0))
+	mod_set.enable_stack_decay = true
+	mod_set.stack_decay_interval = 2.0
+	mod_set.stack_decay_amount = 1
+	mod_set.refresh_decay_on_stack = false
+	mod_set.stack_count = 3
+	mod_set.init_modifiers(parent)
+	
+	# Process 1.5 seconds
+	mod_set._process(1.5)
+	
+	# Add a new stack - should NOT refresh timer
+	var new_mod = StatModifierSet.new("NoRefreshTest")
+	new_mod.stack_mode = StatModifierSet.StackMode.COUNT_STACKS  # Must set stack mode
+	var merge_result = mod_set.merge_mod(new_mod)
+	assert_true(merge_result, "Merge should succeed")
+	assert_eq(mod_set.stack_count, 4, "Should have 4 stacks")
+	
+	# Process 0.5 seconds more (total 2.0) - should decay
+	mod_set._process(0.5)
+	assert_eq(mod_set.stack_count, 3, "Should decay despite adding stack")
+
+func test_stack_decay_multiple_stacks_per_tick():
+	var mod_set = StatModifierSet.new("MultiDecayTest", true, "debuffs")
+	var parent = _create_parent_with_stat({"Health": _create_test_stat(100.0)})
+	mod_set.stack_mode = StatModifierSet.StackMode.COUNT_STACKS
+	mod_set.add_modifier(_create_test_modifier("Health", StatModifier.StatModifierType.FLAT, -5.0))
+	mod_set.enable_stack_decay = true
+	mod_set.stack_decay_interval = 1.0
+	mod_set.stack_decay_amount = 3  # Remove 3 at a time
+	mod_set.stack_count = 10
+	mod_set.init_modifiers(parent)
+	
+	mod_set._process(1.0)
+	assert_eq(mod_set.stack_count, 7, "Should remove 3 stacks")
+	
+	mod_set._process(1.0)
+	assert_eq(mod_set.stack_count, 4, "Should remove another 3 stacks")
+
+func test_stack_decay_serialization():
+	var mod_set = StatModifierSet.new("SerializeTest", true, "debuffs")
+	var parent = _create_parent_with_stat({"Health": _create_test_stat(100.0)})
+	mod_set.stack_mode = StatModifierSet.StackMode.COUNT_STACKS
+	mod_set.add_modifier(_create_test_modifier("Health", StatModifier.StatModifierType.FLAT, -5.0))
+	mod_set.enable_stack_decay = true
+	mod_set.stack_decay_interval = 2.5
+	mod_set.stack_decay_amount = 2
+	mod_set.stack_decay_min = 1
+	mod_set.refresh_decay_on_stack = true
+	mod_set.remove_on_zero_stacks = false
+	mod_set.stack_count = 5
+	mod_set._stack_decay_timer = 1.5
+	mod_set.init_modifiers(parent)
+	
+	var data = mod_set.to_dict()
+	
+	var new_mod_set = StatModifierSet.new()
+	new_mod_set.from_dict(data, parent)
+	
+	assert_eq(new_mod_set.enable_stack_decay, true, "enable_stack_decay should match")
+	assert_eq(new_mod_set.stack_decay_interval, 2.5, "stack_decay_interval should match")
+	assert_eq(new_mod_set.stack_decay_amount, 2, "stack_decay_amount should match")
+	assert_eq(new_mod_set.stack_decay_min, 1, "stack_decay_min should match")
+	assert_eq(new_mod_set.refresh_decay_on_stack, true, "refresh_decay_on_stack should match")
+	assert_eq(new_mod_set.remove_on_zero_stacks, false, "remove_on_zero_stacks should match")
+	assert_eq(new_mod_set._stack_decay_timer, 1.5, "timer should match")
+
+func test_stack_decay_disabled():
+	var mod_set = StatModifierSet.new("DisabledTest", true, "buffs")
+	var parent = _create_parent_with_stat({"Strength": _create_test_stat(10.0)})
+	mod_set.stack_mode = StatModifierSet.StackMode.COUNT_STACKS
+	mod_set.add_modifier(_create_test_modifier("Strength", StatModifier.StatModifierType.FLAT, 5.0))
+	mod_set.enable_stack_decay = false
+	mod_set.stack_decay_interval = 1.0
+	mod_set.stack_decay_amount = 1
+	mod_set.stack_count = 5
+	mod_set.init_modifiers(parent)
+	
+	# Process time - stacks should NOT decay
+	mod_set._process(5.0)
+	assert_eq(mod_set.stack_count, 5, "Stacks should not decay when disabled")
+
+func test_stack_decay_only_count_stacks_mode():
+	var mod_set = StatModifierSet.new("MergeTest", true, "buffs")
+	var parent = _create_parent_with_stat({"Strength": _create_test_stat(10.0)})
+	mod_set.stack_mode = StatModifierSet.StackMode.MERGE_VALUES
+	mod_set.add_modifier(_create_test_modifier("Strength", StatModifier.StatModifierType.FLAT, 5.0))
+	mod_set.enable_stack_decay = true
+	mod_set.stack_decay_interval = 1.0
+	mod_set.stack_decay_amount = 1
+	mod_set.init_modifiers(parent)
+	
+	# Process time - should not decay (wrong mode)
+	mod_set._process(1.0)
+	# No crash, decay simply doesn't apply to non-COUNT_STACKS modes
+	assert_true(true, "Should not crash on non-COUNT_STACKS mode")

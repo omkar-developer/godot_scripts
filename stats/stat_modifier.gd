@@ -221,34 +221,40 @@ func apply(apply_value:float = 0.0) -> float:
 ## Removes the modifier from the stat and returns the actual amount changed [br]
 ## [param remove_all]: Whether to remove the entire amount applied by this modifier. [br]
 ## [return]: The actual amount removed by this modifier.
-func remove(remove_all:bool = true) -> float:
-	if not is_valid(): return 0.0
-	if not _is_applied: return 0.0
+func remove(remove_all: bool = true) -> float:
+	if not is_valid():
+		return 0.0
+	if not _is_applied:
+		return 0.0
 
-	# Early exit since set values cant be removed
-	if _type == StatModifierType.SET_BASE or _type == StatModifierType.SET_BASE or _type == StatModifierType.SET_BASE:
+	# Early exit since SET_* modifiers cannot be undone numerically
+	if _type == StatModifierType.SET_BASE \
+	or _type == StatModifierType.SET_MIN_VALUE \
+	or _type == StatModifierType.SET_MAX_VALUE:
 		_applied_value = 0.0
 		_is_applied = false
 		on_removed.emit()
 		return 0.0
-	
-	# Determine how much to remove (typically the original _value)
-	var removal_amount = _value
+
+	# Determine how much to remove
+	var removal_amount := _value
 	if remove_all or _apply_only_once:
 		removal_amount = _applied_value
-	elif _value > 0.0 and _applied_value + (_value * -1.0) < 0.0:
+	elif _value > 0.0 and _applied_value - _value < 0.0:
 		removal_amount = _applied_value
-	elif _value < 0.0 and _applied_value + (_value * -1.0) > 0.0:
-		removal_amount = _applied_value    
-	
-	var actual_change = _apply_stat_modifier(_type, _stat, removal_amount * -1.0)
+	elif _value < 0.0 and _applied_value - _value > 0.0:
+		removal_amount = _applied_value
 
-	_applied_value += actual_change  # Will subtract since actual_change is negative
-	
-	# Reset state if all effect is removed
-	if abs(_applied_value) <= 0.000001:
+	# Apply the inverse change to the stat (can be clamped)
+	var actual_change := _apply_stat_modifier(_type, _stat, -removal_amount)
+
+	# Always update logical applied value even if clamped prevented full change
+	_applied_value = max(0.0, _applied_value - abs(removal_amount))
+
+	# Clean up state if fully removed
+	if _applied_value <= 0.000001:
 		_is_applied = false
-	
+
 	on_removed.emit()
 	return actual_change
 
