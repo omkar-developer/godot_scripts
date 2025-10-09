@@ -285,7 +285,6 @@ func init_modifiers(parent: Object, apply_effect := true) -> void:
 		push_error("Attempted to set new parent while already initialized without uninitializing first.")
 		return
 	if parent == null: return
-	if not parent.has_method("get_stat"): return
 	_parent = parent
 	for mod in _modifiers:
 		mod.init_stat(parent)
@@ -501,7 +500,7 @@ func to_dict() -> Dictionary:
 func from_dict(data: Dictionary, parent: Object = null) -> void:
 	if data == null: return
 
-	if parent != null and parent.has_method("get_stat"):		
+	if parent != null:		
 		_parent = parent
 	
 	clear_all()

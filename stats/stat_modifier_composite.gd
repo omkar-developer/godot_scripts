@@ -127,10 +127,7 @@ func init_stat(parent: Object) -> bool:
 	
 	# Set up reference stat if specified with fallback mechanism
 	if _ref_stat_name != "":
-		if parent.has_method("get_stat"):
-			_ref_stat = parent.get_stat(_ref_stat_name)
-		if _ref_stat == null:
-			_ref_stat = parent.get(_ref_stat_name.to_snake_case()) as Stat
+		_ref_stat = Stat.get_stat(parent, _ref_stat_name)
 		
 		if !_snapshot_stats and _ref_stat != null:
 			_ref_stat.connect("value_changed", _update_value)

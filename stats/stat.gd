@@ -1,11 +1,11 @@
 @tool
 extends Resource
-## Represents a flexible and configurable stat system with support for clamping, modifiers, and serialization.
-##
-## This class provides a comprehensive stat management system, allowing for base values, flat and percent modifiers,
-## and maximum/minimum constraints. It supports clamping for both base and final values, ensuring stat integrity.
-## The class also emits signals when values change and includes utility functions for normalization, difference
-## calculation, and boolean representation. Additionally, it supports serialization to and from dictionaries for easy
+## Represents a flexible and configurable stat system with support for clamping, modifiers, and serialization.[br]
+##[br]
+## This class provides a comprehensive stat management system, allowing for base values, flat and percent modifiers,[br]
+## and maximum/minimum constraints. It supports clamping for both base and final values, ensuring stat integrity.[br]
+## The class also emits signals when values change and includes utility functions for normalization, difference[br]
+## calculation, and boolean representation. Additionally, it supports serialization to and from dictionaries for easy[br]
 ## saving and loading of stat configurations.
 
 class_name Stat
@@ -32,10 +32,10 @@ var cached_max := 0.0
 		enable_signal = value
 		on_value_changed()
 
-## Emitted when the stat value changes
-## [param new_value]: The new calculated value.
-## [param new_max]: The new maximum value.
-## [param old_value]: The previous calculated value.
+## Emitted when the stat value changes[br]
+## [param new_value]: The new calculated value.[br]
+## [param new_max]: The new maximum value.[br]
+## [param old_value]: The previous calculated value.[br]
 ## [param old_max]: The previous maximum value.
 signal value_changed(new_value, new_max, old_value, old_max)
 
@@ -54,7 +54,8 @@ func get_typed_value(raw_value: float) -> float:
 
 @export_group("Stat")
 
-## Clamps the base value to be between [param min_value] and [param max_value].
+## Clamps the base value to be between [param min_value] and [param max_value].[br]
+## If [param base_value_clamped] is true, the base value will not exceed these bounds.
 @export var base_value_clamped:bool:
 	set(value):
 		if base_value_clamped == value: return
@@ -106,7 +107,7 @@ func get_typed_value(raw_value: float) -> float:
 
 @export_group("Modifiers")
 
-## Clamps the final value to be between [param min_value] and [param max_value].
+## Clamps the final value to be between [param min_value] and [param max_value].[br]
 ## Does not affect the base value.
 @export var final_value_clamped:bool:
 	set(value):
@@ -114,8 +115,8 @@ func get_typed_value(raw_value: float) -> float:
 		final_value_clamped = value
 		on_value_changed()
 
-## Percent modifier applied to base value.
-## Value of 100 means +100% (2x multiplier), not 100% total.
+## Percent modifier applied to base value.[br]
+## Value of 100 means +100% (2x multiplier), not 100% total.[br]
 ## Formula: base_value * (1 + percent_modifier/100)
 @export var percent_modifier:float:
 	set(value):
@@ -161,7 +162,8 @@ func get_typed_value(raw_value: float) -> float:
 		on_value_changed()
 
 @export_group("Limit")
-## Clamps the flat modifier to be between [param flat_modifier_min] and [param flat_modifier_max].
+## Clamps the flat modifier to be between [param flat_modifier_min] and [param flat_modifier_max].[br]
+## If [param flat_modifier_clamped] is true, the flat modifier will not exceed these bounds.
 @export var flat_modifier_clamped:bool = false:
 	set(value):
 		if flat_modifier_clamped == value: return
@@ -194,7 +196,8 @@ func get_typed_value(raw_value: float) -> float:
 		_enable_signal = true
 		on_value_changed()
 
-## Clamps the percent modifier to be between [param percent_modifier_min] and [param percent_modifier_max].
+## Clamps the percent modifier to be between [param percent_modifier_min] and [param percent_modifier_max].[br]
+## If [param percent_modifier_clamped] is true, the percent modifier will not exceed these bounds.
 @export var percent_modifier_clamped:bool = false:
 	set(value):
 		if percent_modifier_clamped == value: return
@@ -227,7 +230,8 @@ func get_typed_value(raw_value: float) -> float:
 		_enable_signal = true
 		on_value_changed()
 
-## Clamps the max percent modifier to be between [param max_percent_modifier_min] and [param max_percent_modifier_max].
+## Clamps the max percent modifier to be between [param max_percent_modifier_min] and [param max_percent_modifier_max].[br]
+## If [param max_percent_modifier_clamped] is true, the max percent modifier will not exceed these bounds.
 @export var max_percent_modifier_clamped:bool = false:
 	set(value):
 		if max_percent_modifier_clamped == value: return
@@ -260,7 +264,8 @@ func get_typed_value(raw_value: float) -> float:
 		_enable_signal = true
 		on_value_changed()
 
-## Clamps the max flat modifier to be between [param max_flat_modifier_min] and [param max_flat_modifier_max].
+## Clamps the max flat modifier to be between [param max_flat_modifier_min] and [param max_flat_modifier_max].[br]
+## If [param max_flat_modifier_clamped] is true, the max flat modifier will not exceed these bounds.
 @export var max_flat_modifier_clamped:bool = false:
 	set(value):
 		if max_flat_modifier_clamped == value: return
@@ -303,15 +308,15 @@ func on_value_changed() -> void:
 		cached_value = current_value
 		cached_max = current_max
 
-## Constructor for initializing the stat.
-## [param _base_value]: Initial base value (default: 0.0).
-## [param _base_value_clamped]: Whether the base value is clamped (default: true).
-## [param _min_value]: Minimum value (default: 0.0).
-## [param _max_value]: Maximum value (default: 100.0).
-## [param _final_value_clamped]: Whether the final value is clamped (default: false).
-## [param _flat_modifier]: Initial flat modifier (default: 0.0).
-## [param _percent_modifier]: Initial percent modifier (default: 0.0).
-## [param _max_percent_modifier]: Initial max percent modifier (default: 0.0).
+## Constructor for initializing the stat.[br]
+## [param _base_value]: Initial base value (default: 0.0).[br]
+## [param _base_value_clamped]: Whether the base value is clamped (default: true).[br]
+## [param _min_value]: Minimum value (default: 0.0).[br]
+## [param _max_value]: Maximum value (default: 100.0).[br]
+## [param _final_value_clamped]: Whether the final value is clamped (default: false).[br]
+## [param _flat_modifier]: Initial flat modifier (default: 0.0).[br]
+## [param _percent_modifier]: Initial percent modifier (default: 0.0).[br]
+## [param _max_percent_modifier]: Initial max percent modifier (default: 0.0).[br]
 ## [param _max_flat_modifier]: Initial max flat modifier (default: 0.0).
 func _init(_base_value = 0.0, _base_value_clamped = false, _min_value = 0.0, _max_value = 100.0, _final_value_clamped = false, _flat_modifier = 0.0, _percent_modifier = 0.0, _max_percent_modifier = 0.0, _max_flat_modifier = 0.0) -> void:
 	_enable_signal = false
@@ -326,7 +331,7 @@ func _init(_base_value = 0.0, _base_value_clamped = false, _min_value = 0.0, _ma
 	self.max_flat_modifier = _max_flat_modifier
 	_enable_signal = true
 
-## Returns the calculated value of the stat.
+## Returns the calculated value of the stat.[br]
 ## If [param final_value_clamped] is true, returns the clamped value.
 func get_value() -> float:
 	var raw_value
@@ -486,12 +491,38 @@ func reset_modifiers() -> void:
 	_enable_signal = true
 	on_value_changed()
 
-## Returns the difference between the current stat and another stat.
-## [param other_stat]: The stat to compare with.
-## [return]: A dictionary containing:
-##           - "old_value": The current value of the stat.
-##           - "old_max": The current maximum value of the stat.
-##           - "value_diff": The difference in the stat's value.
+## Utility: Retrieve a Stat from an object by name.
+## Searches via get_stat() method if available, else tries direct property access.
+## Returns null if not found or not a Stat.
+static func get_stat(parent: Object, name: String, warn: bool = false) -> Stat:
+	if parent == null:
+		if warn:
+			push_warning("Stat.get_stat(): parent is null")
+		return null
+
+	var stat: Stat = null
+
+	# If parent has custom getter (common in entities)
+	if parent.has_method("get_stat"):
+		stat = parent.get_stat(name) as Stat
+
+	# If not found yet, try normalized property
+	if stat == null:
+		var normalized := name.to_snake_case()
+		stat = parent.get(normalized) as Stat
+
+	# Warn only if still missing
+	if stat == null and warn:
+		push_warning("Stat.get_stat(): Could not find stat '%s' in %s" % [name, parent])
+
+	return stat
+
+## Returns the difference between the current stat and another stat.[br]
+## [param other_stat]: The stat to compare with.[br]
+## [return]: A dictionary containing:[br]
+##           - "old_value": The current value of the stat.[br]
+##           - "old_max": The current maximum value of the stat.[br]
+##           - "value_diff": The difference in the stat's value.[br]
 ##           - "max_diff": The difference in the stat's max value.
 func get_difference_from(other_stat: Stat) -> Dictionary:
 	if not other_stat:
@@ -573,7 +604,7 @@ func from_dict(dict: Dictionary) -> void:
 	on_value_changed()
 
 #region Factory Methods
-## Creates a stat with just a base value, no clamping.
+## Creates a stat with just a base value, no clamping.[br]
 ## Useful for stats that can grow unbounded (damage, speed bonuses, etc.)
 static func create_value(base: float) -> Stat:
 	var s = Stat.new()
@@ -582,7 +613,7 @@ static func create_value(base: float) -> Stat:
 	s.final_value_clamped = false
 	return s
 
-## Creates a clamped stat with min/max bounds.
+## Creates a clamped stat with min/max bounds.[br]
 ## Useful for resources (health, mana, shield) or percentage stats (0-1 range).
 static func create_clamped(base: float, minimum: float, maximum: float) -> Stat:
 	var s = Stat.new()
@@ -593,7 +624,7 @@ static func create_clamped(base: float, minimum: float, maximum: float) -> Stat:
 	s.final_value_clamped = true
 	return s
 
-## Creates a clamped stat where base starts at max.
+## Creates a clamped stat where base starts at max.[br]
 ## Common pattern for health/shield initialization.
 static func create_full(maximum: float, minimum: float = 0.0) -> Stat:
 	var s = Stat.new()
@@ -604,7 +635,7 @@ static func create_full(maximum: float, minimum: float = 0.0) -> Stat:
 	s.final_value_clamped = true
 	return s
 
-## Creates a percentage stat (0.0 to 1.0 range, clamped).
+## Creates a percentage stat (0.0 to 1.0 range, clamped).[br]
 ## Useful for crit chance, damage resistance, etc.
 static func create_percentage(base: float = 0.0, maximum: float = 1.0, minimum: float = 0.0) -> Stat:
 	return create_clamped(base, minimum, maximum)

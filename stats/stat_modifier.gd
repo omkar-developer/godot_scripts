@@ -70,15 +70,8 @@ func init_stat(parent: Object) -> bool:
 	if _stat != null: 
 		uninit_stat()
 	
-	if parent.has_method("get_stat"):
-		_stat = parent.get_stat(_stat_name)
-		
+	_stat = Stat.get_stat(parent, _stat_name, true)
 	if _stat == null:
-		var normalized_name = _stat_name.to_snake_case()
-		_stat = parent.get(normalized_name) as Stat
-	
-	if _stat == null:
-		push_warning("Could not find stat named '%s' in parent" % _stat_name)
 		return false
 
 	return true
