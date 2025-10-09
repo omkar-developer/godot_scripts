@@ -24,9 +24,16 @@ func to_dict() -> Dictionary:
 
 ## Populates the UpgradeLevelConfig from a dictionary.
 func from_dict(dict: Dictionary) -> void:
-	xp_required = dict["xp_required"]
-	modifiers.from_dict(dict["modifiers"])
+	xp_required = dict.get("xp_required", 0)
+
+	if dict.has("modifiers"):
+		if not modifiers:
+			modifiers = StatModifierSet.new()
+		modifiers.from_dict(dict["modifiers"])
+	else:
+		modifiers = StatModifierSet.new()
+
 	required_materials.clear()
-	for material in dict["required_materials"]:
-		var quantity = dict["required_materials"][material]
-		required_materials[material] = quantity
+	if dict.has("required_materials"):
+		for material in dict["required_materials"]:
+			required_materials[material] = dict["required_materials"][material]

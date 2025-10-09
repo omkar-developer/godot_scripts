@@ -10,9 +10,6 @@
 extends Resource
 class_name Upgrade
 
-#TODO: add feature to not cosume materials on level up only check if they are enough
-#TODO: try to not apply and remove when getign temp modifiers instead made save state before applt upgrade or save the diff.
-
 ## Emitted when an upgrade is successfully applied.[br]
 ## Passes the [param new_level] that was just reached and the [param applied_config] ([UpgradeLevelConfig]) for that level.
 signal upgrade_applied(new_level: int, applied_config: UpgradeLevelConfig)
@@ -45,6 +42,8 @@ signal refund_applied(xp: int, materials: Dictionary)
 @export var current_level: int = 0
 ## The current accumulated experience points towards the next level.
 @export var current_xp: int = 0
+
+@export var consume_materials_on_upgrade: bool = true
 
 @export_group("Auto Generate")
 ## Curve defining how XP requirements scale between first and last upgrade
@@ -117,10 +116,9 @@ var _inventory: Object = null # Assuming an Inventory class/script exists
 func init_upgrade(stat_owner: Object, inventory: Object) -> void:    
 	assert(is_instance_valid(stat_owner), "UpgradeTrack.init: stat_owner must be a valid object.")
 	if _inventory != null:
-		assert(is_instance_valid(inventory), "UpgradeTrack.init: inventory must be a valid object.")
+		assert(is_instance_valid(_inventory), "UpgradeTrack.init: inventory must be a valid object.")
 		assert(inventory.has_method("has_materials"), "Inventory must have a has_materials method.")
 		assert(inventory.has_method("consume_materials"), "Inventory must have a consume_materials method.")
-	assert(stat_owner.has_method("get_stat"), "parent must have get_stat method")
 	_stat_owner = stat_owner
 	_inventory = inventory
 
@@ -422,11 +420,18 @@ func do_upgrade(ignore_cost: bool = false) -> bool:
 	else:
 		config = level_configs[current_level]
 
-	# Deduct materials
+	# Check and optionally consume materials
 	if (_inventory and config.required_materials) and not ignore_cost:
-		if not _inventory.consume_materials(config.required_materials):
-			printerr("Upgrade: Failed to consume required materials for upgrade.")
+		# Always verify materials are available
+		if not _inventory.has_materials(config.required_materials):
+			printerr("Upgrade: Not enough materials for upgrade.")
 			return false
+		
+		# Only consume if the flag is enabled
+		if consume_materials_on_upgrade:
+			if not _inventory.consume_materials(config.required_materials):
+				printerr("Upgrade: Failed to consume required materials for upgrade.")
+				return false
 
 	# Remove modifiers from the level we are leaving (if any were applied)
 	remove_current_upgrade()
@@ -589,26 +594,25 @@ func get_total_refund() -> Dictionary:
 ## Refunds the player's XP and materials for the current level (if any) and resets the upgrade to the initial state (level 0, 0 XP) removing any currently applied modifiers.[br].
 ## [return]: The total amount of XP refunded.
 func do_refund() -> int:
-	# First, get all refundable materials and XP from inventory
+	# First, gather refundable data
 	var refund_data := get_total_refund()
-	
-	# Return all consumed materials to the player's inventory
-	if _inventory and not refund_data.materials.is_empty():
+
+	# Only refund materials if they were originally consumed
+	if consume_materials_on_upgrade and _inventory and not refund_data.materials.is_empty():
 		if _inventory.has_method("store_materials"):
 			_inventory.store_materials(refund_data.materials)
 		else:
 			printerr("UpgradeTrack: Inventory does not have a store_materials method.")
 			return 0
-	
-	# Reset XP back to 0
+
+	# Reset XP and level
 	reset_upgrades()
-	
-	# Emit the refund signal with total amount
-	emit_signal("refund_applied",
-		refund_data.xp,
-		refund_data.materials
-	)
+
+	# Emit refund signal
+	emit_signal("refund_applied", refund_data.xp, refund_data.materials)
+
 	return refund_data.xp
+
 
 ## Returns the [UpgradeLevelConfig] for the current level (if any) or null.
 func get_current_level_config() -> UpgradeLevelConfig:
@@ -637,58 +641,95 @@ func to_dict() -> Dictionary:
 		"current_xp": current_xp,
 		"auto_upgrade": auto_upgrade,
 		"enable_infinite_levels": enable_infinite_levels,
+
+		# Patterns & scaling parameters
 		"infinite_xp_pattern": infinite_xp_pattern,
 		"infinite_material_pattern": infinite_material_pattern,
 		"infinite_modifier_pattern": infinite_modifier_pattern,
+
 		"infinite_xp_multiplier": infinite_xp_multiplier,
 		"infinite_material_multiplier": infinite_material_multiplier,
 		"infinite_modifier_multiplier": infinite_modifier_multiplier,
+
+		"infinite_xp_exponent": infinite_xp_exponent,
+		"infinite_material_exponent": infinite_material_exponent,
+		"infinite_modifier_exponent": infinite_modifier_exponent,
+
+		"infinite_xp_formula": infinite_xp_formula,
+		"infinite_material_formula": infinite_material_formula,
+		"infinite_modifier_formula": infinite_modifier_formula,
+		"consume_materials_on_upgrade" : consume_materials_on_upgrade
 	}
-	
-	# Save current modifier state if exists
+
+	# Serialize all level configs (deep)
+	if level_configs.size() > 0:
+		var levels_data: Array = []
+		for cfg in level_configs:
+			if cfg and cfg.has_method("to_dict"):
+				levels_data.append(cfg.to_dict())
+		data["level_configs"] = levels_data
+
+	# Save current modifier (if exists)
 	if _current_modifier:
 		data["current_modifier"] = {
 			"class_type": _current_modifier.get_script().get_global_name(),
 			"data": _current_modifier.to_dict() if _current_modifier.has_method("to_dict") else {}
 		}
-		
+
 	return data
+
 
 ## Restores the upgrade track state from a [Dictionary].
 func from_dict(data: Dictionary) -> bool:
-	# Check for required keys
 	if not data.has("current_level") or not data.has("current_xp"):
 		return false
-	
-	# Reset current state
+
 	reset_upgrades()
-	
-	# Restore values
+
 	auto_upgrade = data.get("auto_upgrade", auto_upgrade)
 	enable_infinite_levels = data.get("enable_infinite_levels", enable_infinite_levels)
-	
-	# Restore pattern settings if available
+
+	# Restore pattern & scaling settings
 	infinite_xp_pattern = data.get("infinite_xp_pattern", infinite_xp_pattern)
 	infinite_material_pattern = data.get("infinite_material_pattern", infinite_material_pattern)
 	infinite_modifier_pattern = data.get("infinite_modifier_pattern", infinite_modifier_pattern)
-	
-	# Restore growth multipliers if available
+
 	infinite_xp_multiplier = data.get("infinite_xp_multiplier", infinite_xp_multiplier)
 	infinite_material_multiplier = data.get("infinite_material_multiplier", infinite_material_multiplier)
 	infinite_modifier_multiplier = data.get("infinite_modifier_multiplier", infinite_modifier_multiplier)
-	
-	current_xp = data.get("current_xp")
-	current_level = data.get("current_level")
-	
-	# Restore modifier state if present
+
+	infinite_xp_exponent = data.get("infinite_xp_exponent", infinite_xp_exponent)
+	infinite_material_exponent = data.get("infinite_material_exponent", infinite_material_exponent)
+	infinite_modifier_exponent = data.get("infinite_modifier_exponent", infinite_modifier_exponent)
+
+	infinite_xp_formula = data.get("infinite_xp_formula", infinite_xp_formula)
+	infinite_material_formula = data.get("infinite_material_formula", infinite_material_formula)
+	infinite_modifier_formula = data.get("infinite_modifier_formula", infinite_modifier_formula)
+
+	consume_materials_on_upgrade = data.get("consume_materials_on_upgrade", consume_materials_on_upgrade)
+
+	current_xp = data.get("current_xp", 0.0)
+	current_level = data.get("current_level", 0)
+
+	# Restore serialized level configs
+	level_configs.clear()
+	var levels_data: Array = data.get("level_configs", [])
+	for cfg_data in levels_data:
+		var cfg := _instantiate_class("UpgradeLevelConfig")
+		if cfg and cfg.has_method("from_dict"):
+			cfg.from_dict(cfg_data)
+		level_configs.append(cfg)
+
+	# Restore current modifier (if any)
 	var current_modifier_data = data.get("current_modifier")
 	if current_modifier_data:
 		var class_type = current_modifier_data.get("class_type", "StatModifierSet")
 		_current_modifier = _instantiate_class(class_type)
 		if _current_modifier and _current_modifier.has_method("from_dict"):
 			_current_modifier.from_dict(current_modifier_data.get("data", {}))
-	
+
 	return true
+
 
 ## Instantiates a class from its global class name.
 func _instantiate_class(class_type: String) -> Object:

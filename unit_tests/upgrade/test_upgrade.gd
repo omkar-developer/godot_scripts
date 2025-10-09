@@ -615,3 +615,17 @@ func test_has_preview_with_infinite():
 		assert_eq(preview_set._modifiers[0]._stat_name, 
 				  extrapolated.modifiers._modifiers[0]._stat_name,
 				  "Preview modifiers should match extrapolated ones")
+
+func test_upgrade_without_consuming_materials():
+	# Add enough XP for level 1
+	upgrade.add_xp(100)
+	
+	# Perform upgrade with ignore_cost flag to skip material consumption
+	mock_inventory.consumed = false
+	watch_signals(upgrade)
+	var result = upgrade.do_upgrade(true) # ignore_cost = true
+	
+	assert_true(result, "Upgrade should succeed even without consuming materials")
+	assert_eq(upgrade.current_level, 1, "Level should increase to 1")
+	assert_false(mock_inventory.consumed, "Materials should NOT be consumed")
+	assert_signal_emitted(upgrade, "upgrade_applied")

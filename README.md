@@ -58,6 +58,10 @@ stat.add_percent_modifier(0.2)
 print(stat.get_value()) # 18
 ```
 
+### Upgrades System
+[Docs](./upgrade.md)
+A flexible and powerful **upgrade/progression system** for RPG-style stats, handling XP, levels, material requirements, and stat modifications via `StatModifierSet`s. Supports **manual or auto-upgrades**, **infinite levels**, and previewing effects before applying them.
+
 ## Godot Compatibility
 
 - Designed for **Godot 4.x** (tested on 4.2+)
