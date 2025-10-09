@@ -231,6 +231,14 @@ stack_mode: StackMode            # How to handle duplicates
 max_stacks: int                  # -1 = unlimited
 stack_source_id: String          # For INDEPENDENT mode
 stack_count: int                 # Current stacks (COUNT_STACKS mode)
+
+# Stack Decay (for COUNT_STACKS mode)
+enable_stack_decay: bool         # Enable automatic stack reduction
+stack_decay_interval: float      # Seconds between decay ticks
+stack_decay_amount: int          # Stacks to remove per tick (-1 = all)
+stack_decay_min: int             # Minimum stacks to keep (usually 0)
+refresh_decay_on_stack: bool     # Reset timer when adding stacks
+remove_on_zero_stacks: bool      # Auto-delete when reaching minimum
 ```
 
 #### StackMode Enum
@@ -264,8 +272,48 @@ from_dict(data: Dictionary, parent: Object)
 - `_modifier_name` must be unique in BuffManager
 - Condition signals auto-apply/remove effects
 - For timed effects, use `StatModifierSetTimed` instead
+- Stack decay only works with `COUNT_STACKS` mode
+- Set `process = true` for stack decay to function
 
 ---
+
+## Stack Decay Pattern
+
+### Gradual Stack Loss Example
+
+```gdscript
+var fury = StatModifierSet.new("fury", true, "buffs")  # process must be true
+fury.stack_mode = StatModifierSet.StackMode.COUNT_STACKS
+fury.max_stacks = 10
+fury.add_modifier(StatModifier.new("attack_speed", StatModifier.StatModifierType.PERCENT, 5))
+
+# Decay Configuration
+fury.enable_stack_decay = true
+fury.stack_decay_interval = 2.0      # Lose stacks every 2 seconds
+fury.stack_decay_amount = 1          # Lose 1 stack per tick
+fury.stack_decay_min = 0             # Remove completely at 0
+fury.refresh_decay_on_stack = true   # Reset timer when gaining stacks
+fury.remove_on_zero_stacks = true    # Auto-delete when empty
+
+buff_manager.apply_modifier(fury)
+# Build up to 10 stacks, then decay 1 every 2s when not refreshed
+```
+
+### Decay Strategies
+
+| Pattern | Configuration | Use Case |
+|---------|--------------|----------|
+| **Gradual decay** | `amount = 1`, `refresh = false` | Poison stacks, bleed effects |
+| **All at once** | `amount = -1`, `refresh = true` | Combo meter, rage (LoL style) |
+| **Partial preserve** | `amount = 2`, `min = 1` | Keep minimum buff active |
+| **Out of combat** | `amount = 1`, `interval = 5.0` | Fury, focus systems |
+
+### Stack Decay vs Duration
+
+- Use **decay** for `COUNT_STACKS` mode (single modifier, multiple stacks)
+- Use **duration** (`StatModifierSetTimed`) for `INDEPENDENT` mode (multiple instances)
+- Decay = unified timer for all stacks
+- Duration = individual timers per stack instance
 
 ### `StatModifierSetTimed`
 
