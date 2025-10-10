@@ -5,7 +5,7 @@ extends Node
 var component: HealthComponent
 
 func _ready():
-	component = HealthComponent.new()
+	component = HealthComponent.new(self)
 	component.max_health = max_health
 	component.current_health = max_health
 	component.connect("died", Callable(self, "_on_died"))

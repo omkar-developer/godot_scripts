@@ -5,7 +5,7 @@ var health: HealthComponent
 
 func _ready():
 	movement = MovementComponent.new(self, 80.0, Vector2.LEFT)
-	health = HealthComponent.new()
+	health = HealthComponent.new(self)
 	health.connect("died", Callable(self, "_on_died"))
 
 func _process(delta):
