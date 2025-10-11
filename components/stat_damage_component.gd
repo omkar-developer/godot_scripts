@@ -1,4 +1,4 @@
-class_name StatBasedDamageComponent
+class_name StatDamageComponent
 extends DamageComponent
 
 ## Stat-based damage component that calculates damage from owner's stats.[br]
@@ -48,10 +48,10 @@ var _cached_damage: float = 0.0
 var _damage_cache_dirty: bool = true
 
 ## Constructor.[br]
-## [param _owner]: The Node that owns this component (must have attack stats).[br]
+## [param _owner]: The Object that owns this component (must have attack stats).[br]
 ## [param _base_damage]: Base damage before stat scaling.[br]
 ## [param _damage_scaling]: Multiplier for attack stat (0.8 = 80% of attack).
-func _init(_owner: Node, _base_damage: float = 10.0, _damage_scaling: float = 0.8) -> void:
+func _init(_owner: Object, _base_damage: float = 10.0, _damage_scaling: float = 0.8) -> void:
 	super._init(_owner)
 	base_damage = _base_damage
 	damage_scaling = _damage_scaling
@@ -164,7 +164,7 @@ func copy_from(other: DamageComponent, copy_owner: bool = true) -> void:
 	super.copy_from(other, copy_owner)
 	
 	# If copying from another StatBasedDamageComponent, copy extra properties
-	if other is StatBasedDamageComponent:
+	if other is StatDamageComponent:
 		base_damage = other.base_damage
 		damage_scaling = other.damage_scaling
 		

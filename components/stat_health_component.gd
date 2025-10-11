@@ -1,4 +1,4 @@
-class_name StatBasedHealthComponent
+class_name StatHealthComponent
 extends BaseHealthComponent
 
 ## Stat-based health component that integrates with the Stat system.[br]
@@ -35,7 +35,7 @@ var damage_reduction_stat_name: String = "armor"
 var _resistance_cache: Dictionary = {}  # {damage_type: Stat}
 
 ## Constructor.[br]
-## [param _owner]: The Node that owns this component (must have health stat).[br]
+## [param _owner]: The Object that owns this component (must have health stat).[br]
 ## [param _iframe_duration]: Seconds of invulnerability after taking damage (0.0 = disabled).[br]
 ## [param _shield_enabled]: Whether to process shield damage (requires shield stat on owner).[br]
 ## [param _health_stat_name]: Name of the health stat property on owner.[br]
@@ -44,7 +44,7 @@ var _resistance_cache: Dictionary = {}  # {damage_type: Stat}
 ## [param _prevent_death_once]: Whether to prevent death once at 1 HP.[br]
 ## [param _immune_damage_types]: Array of damage types to completely ignore.
 func _init(
-	_owner: Node,
+	_owner: Object,
 	_iframe_duration: float = 0.0,
 	_shield_enabled: bool = false,
 	_health_stat_name: String = "health",

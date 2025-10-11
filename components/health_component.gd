@@ -29,7 +29,7 @@ var damage_multiplier: float = 1.0
 var resistances: Dictionary = {}  # {int: float}
 
 ## Constructor.[br]
-## [param _owner]: The Node that owns this component.[br]
+## [param _owner]: The Object that owns this component.[br]
 ## [param _max_health]: Maximum health value.[br]
 ## [param _iframe_duration]: Seconds of invulnerability after taking damage (0.0 = disabled).[br]
 ## [param _shield_enabled]: Whether to process shield damage.[br]
@@ -38,7 +38,7 @@ var resistances: Dictionary = {}  # {int: float}
 ## [param _prevent_death_once]: Whether to prevent death once at 1 HP.[br]
 ## [param _immune_damage_types]: Array of damage types to completely ignore.
 func _init(
-	_owner: Node,
+	_owner: Object,
 	_max_health: float = 100.0,
 	_iframe_duration: float = 0.0,
 	_shield_enabled: bool = false,

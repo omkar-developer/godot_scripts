@@ -144,14 +144,14 @@ func test_damage_component_copy_from_without_owner():
 
 
 # ============================================================================
-# StatBasedDamageComponent Tests
+# StatDamageComponent Tests
 # ============================================================================
 
 func test_stat_based_damage_calculation():
 	# Create player with stats
 	var player = _create_player_with_stats(50.0, 0.2, 0.25, 0.5)
 	
-	var damage_comp = StatBasedDamageComponent.new(player, 10.0, 0.8)
+	var damage_comp = StatDamageComponent.new(player, 10.0, 0.8)
 	var request = damage_comp.create_request()
 	
 	# Expected: base=10 + (attack=50 * scale=0.8) = 50
@@ -162,7 +162,7 @@ func test_stat_based_damage_calculation():
 
 func test_stat_based_damage_recalculates_on_stat_change():
 	var player = _create_player_with_stats(50.0, 0.0, 0.0, 0.0)
-	var damage_comp = StatBasedDamageComponent.new(player, 10.0, 0.8)
+	var damage_comp = StatDamageComponent.new(player, 10.0, 0.8)
 	
 	var request1 = damage_comp.create_request()
 	assert_almost_eq(request1.damage, 50.0, 0.01, "Initial damage: 10 + (50*0.8)")
@@ -177,7 +177,7 @@ func test_stat_based_damage_without_stats():
 	var player = Node.new()
 	add_child_autofree(player)
 	
-	var damage_comp = StatBasedDamageComponent.new(player, 25.0, 0.8)
+	var damage_comp = StatDamageComponent.new(player, 25.0, 0.8)
 	var request = damage_comp.create_request()
 	
 	# Without stats, should just use base damage
@@ -190,7 +190,7 @@ func test_stat_based_damage_without_stats():
 
 func test_health_component_takes_damage():
 	var enemy = _create_enemy_with_health(100.0)
-	var health_comp = StatBasedHealthComponent.new(enemy)
+	var health_comp = StatHealthComponent.new(enemy)
 	
 	var request = DamageRequest.new(mock_player, 30.0, 0)
 	var result = health_comp.process_damage(request)
@@ -201,7 +201,7 @@ func test_health_component_takes_damage():
 
 func test_health_component_death_detection():
 	var enemy = _create_enemy_with_health(50.0)
-	var health_comp = StatBasedHealthComponent.new(enemy)
+	var health_comp = StatHealthComponent.new(enemy)
 	
 	var died_signal = watch_signals(health_comp)
 	
@@ -214,7 +214,7 @@ func test_health_component_death_detection():
 
 func test_health_component_iframes():
 	var enemy = _create_enemy_with_health(100.0)
-	var health_comp = StatBasedHealthComponent.new(enemy, 0.5)  # 0.5s iframes
+	var health_comp = StatHealthComponent.new(enemy, 0.5)  # 0.5s iframes
 	
 	# First hit
 	var request1 = DamageRequest.new(mock_player, 30.0, 0)
@@ -229,7 +229,7 @@ func test_health_component_iframes():
 
 func test_health_component_resistance():
 	var enemy = _create_enemy_with_resistance(100.0, 0.5)  # 50% fire resist
-	var health_comp = StatBasedHealthComponent.new(enemy)
+	var health_comp = StatHealthComponent.new(enemy)
 	
 	var request = DamageRequest.new(mock_player, 100.0, 1)  # Fire damage
 	var result = health_comp.process_damage(request)
@@ -239,7 +239,7 @@ func test_health_component_resistance():
 
 func test_health_component_shield():
 	var enemy = _create_enemy_with_shield(100.0, 30.0)
-	var health_comp = StatBasedHealthComponent.new(enemy, 0.0, true)  # Shield enabled
+	var health_comp = StatHealthComponent.new(enemy, 0.0, true)  # Shield enabled
 	
 	var request = DamageRequest.new(mock_player, 50.0, 0)
 	var result = health_comp.process_damage(request)
@@ -251,7 +251,7 @@ func test_health_component_shield():
 
 func test_health_component_death_prevention():
 	var enemy = _create_enemy_with_health(10.0)
-	var health_comp = StatBasedHealthComponent.new(enemy, 0.0, false, "health", "shield", 0.0, true)
+	var health_comp = StatHealthComponent.new(enemy, 0.0, false, "health", "shield", 0.0, true)
 	
 	var death_prevented_signal = watch_signals(health_comp)
 	
@@ -264,7 +264,7 @@ func test_health_component_death_prevention():
 
 func test_health_component_damage_type_immunity():
 	var enemy = _create_enemy_with_health(100.0)
-	var health_comp = StatBasedHealthComponent.new(enemy, 0.0, false, "health", "shield", 0.0, false, [1, 3])
+	var health_comp = StatHealthComponent.new(enemy, 0.0, false, "health", "shield", 0.0, false, [1, 3])
 	
 	# Immune damage type
 	var request1 = DamageRequest.new(mock_player, 50.0, 1)
@@ -285,12 +285,12 @@ func test_health_component_damage_type_immunity():
 
 func test_full_damage_flow():
 	# Player with damage component
-	var player = _create_player_with_stats(50.0, 0.0, 0.0, 0.0)
-	var player_damage = StatBasedDamageComponent.new(player, 20.0, 0.8)
+	var player = _create_player_with_stats(50.0, 0.0, 0.3, 0.5)
+	var player_damage = StatDamageComponent.new(player, 20.0, 0.8)
 	
 	# Enemy with health component
 	var enemy = _create_enemy_with_health(100.0)
-	var enemy_health = StatBasedHealthComponent.new(enemy)
+	var enemy_health = StatHealthComponent.new(enemy)
 	
 	# Player attacks
 	var result = player_damage.apply_to(enemy_health)
@@ -303,7 +303,7 @@ func test_full_damage_flow():
 func test_bullet_with_request_pattern():
 	# Player creates request
 	var player = _create_player_with_stats(40.0, 0.0, 0.0, 0.0)
-	var player_damage = StatBasedDamageComponent.new(player, 10.0, 1.0)
+	var player_damage = StatDamageComponent.new(player, 10.0, 1.0)
 	var request = player_damage.create_request()
 	
 	# Bullet carries request (simulate)
@@ -315,7 +315,7 @@ func test_bullet_with_request_pattern():
 	
 	# Bullet hits enemy
 	var enemy = _create_enemy_with_health(100.0)
-	var enemy_health = StatBasedHealthComponent.new(enemy)
+	var enemy_health = StatHealthComponent.new(enemy)
 	var result = enemy_health.process_damage(bullet_request)
 	
 	# Damage still works

@@ -9,7 +9,7 @@ extends RefCounted
 ## All damage processing logic and calculations are handled here.
 
 ## Reference to the entity that owns this component
-var owner: Node = null
+var owner: Object = null
 
 ## Optional damage calculator for custom damage formulas
 var damage_calculator: DamageCalculator = null
@@ -94,14 +94,14 @@ signal death_prevented(request: DamageRequest)
 signal damage_immunity_triggered(damage_type: int)
 
 ## Constructor.[br]
-## [param _owner]: The Node that owns this component.[br]
+## [param _owner]: The Object that owns this component.[br]
 ## [param _iframe_duration]: Seconds of invulnerability after taking damage (0.0 = disabled).[br]
 ## [param _shield_enabled]: Whether to process shield damage.[br]
 ## [param _max_damage_per_hit]: Maximum damage allowed per hit (0.0 = no limit).[br]
 ## [param _prevent_death_once]: Whether to prevent death once at 1 HP.[br]
 ## [param _immune_damage_types]: Array of damage types to completely ignore.
 func _init(
-	_owner: Node,
+	_owner: Object,
 	_iframe_duration: float = 0.0,
 	_shield_enabled: bool = false,
 	_max_damage_per_hit: float = 0.0,
