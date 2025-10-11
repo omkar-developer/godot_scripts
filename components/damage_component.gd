@@ -8,7 +8,7 @@ extends RefCounted
 ## The component can apply damage directly to targets or create requests for manual handling.
 
 ## Reference to the entity that owns this component
-var owner: Node = null
+var owner: Object = null
 
 ## Base damage amount (fixed value)
 var damage: float = 10.0
@@ -28,15 +28,15 @@ var knockback: Vector2 = Vector2.ZERO
 ## Emitted when damage is successfully applied to a target.[br]
 ## [param target]: The entity that was damaged.[br]
 ## [param result]: DamageResult containing actual damage dealt.
-signal damage_applied(target: Node, result: DamageResult)
+signal damage_applied(target: Object, result: DamageResult)
 
 ## Emitted when damage application fails (target has no process_damage method).[br]
 ## [param target]: The entity that couldn't be damaged.
-signal damage_failed(target: Node)
+signal damage_failed(target: Object)
 
 ## Constructor.[br]
 ## [param _owner]: The Node that owns this component (damage source).
-func _init(_owner: Node = null) -> void:
+func _init(_owner: Object = null) -> void:
 	owner = _owner
 
 
@@ -56,7 +56,7 @@ func create_request() -> DamageRequest:
 ## Apply damage directly to a target node.[br]
 ## [param target]: The node to damage (must have process_damage method).[br]
 ## [return]: DamageResult if successful, null if target can't be damaged.
-func apply_to(target: Node) -> DamageResult:
+func apply_to(target: Object) -> DamageResult:
 	if not is_instance_valid(target) or not target.has_method("process_damage"):
 		damage_failed.emit(target)
 		return null
@@ -72,12 +72,12 @@ func apply_to(target: Node) -> DamageResult:
 
 ## Set the owner node with weak reference tracking.[br]
 ## [param _owner]: The Node that owns this component.
-func set_owner(_owner: Node) -> void:
+func set_owner(_owner: Object) -> void:
 	owner = _owner
 
 ## Get the owner node if still valid.[br]
 ## [return]: Owner Node if valid, null if freed.
-func get_owner() -> Node:
+func get_owner() -> Object:
 	return owner
 
 
