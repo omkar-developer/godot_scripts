@@ -342,6 +342,7 @@ func _should_update_on_loss(target: Node) -> bool:
 	return update_mode == UpdateMode.ON_TARGET_LOST and tracked_targets.has(target)
 
 
+#TODO: maybe ned optimizations
 ## Internal: Recalculate tracked targets based on priority.
 func _recalculate_targets() -> void:
 	# Clean invalid targets if auto-cleanup enabled
@@ -513,32 +514,32 @@ func _scan_existing_targets() -> void:
 
 ## Internal: Find closest target by distance.
 func _get_closest_target() -> Node:
-	if not owner is Node:
+	if not owner is Node2D:
 		return valid_targets[0] if not valid_targets.is_empty() else null
 	
-	var owner_node = owner as Node
+	var owner_node = owner as Node2D  # Changed to Node2D
 	var closest: Node = null
 	var min_dist = INF
 	
 	for target in valid_targets:
-		if not is_instance_valid(target):
+		if not is_instance_valid(target) or not target is Node2D:
 			continue
 		
-		var dist = owner_node.global_position.distance_squared_to(target.global_position)
+		var target_node = target as Node2D
+		var dist = owner_node.global_position.distance_squared_to(target_node.global_position)
 		if dist < min_dist:
 			min_dist = dist
-			closest = target
+			closest = target_node
 	
 	return closest
 
-
 ## Internal: Find farthest target by distance.
-func _get_farthest_target() -> Node:
-	if not owner is Node:
+func _get_farthest_target() -> Node2D:
+	if not owner is Node2D:
 		return valid_targets[-1] if not valid_targets.is_empty() else null
 	
-	var owner_node = owner as Node
-	var farthest: Node = null
+	var owner_node = owner as Node2D
+	var farthest: Node2D = null
 	var max_dist = -INF
 	
 	for target in valid_targets:
@@ -554,8 +555,8 @@ func _get_farthest_target() -> Node:
 
 
 ## Internal: Find target with lowest HP.
-func _get_lowest_hp_target() -> Node:
-	var lowest: Node = null
+func _get_lowest_hp_target() -> Node2D:
+	var lowest: Node2D = null
 	var min_hp = INF
 	
 	for target in valid_targets:
@@ -574,8 +575,8 @@ func _get_lowest_hp_target() -> Node:
 
 
 ## Internal: Find target with highest HP.
-func _get_highest_hp_target() -> Node:
-	var highest: Node = null
+func _get_highest_hp_target() -> Node2D:
+	var highest: Node2D = null
 	var max_hp = -INF
 	
 	for target in valid_targets:

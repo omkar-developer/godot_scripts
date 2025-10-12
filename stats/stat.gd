@@ -405,6 +405,10 @@ func set_direct_value(amount: float) -> float:
 	base_value = get_typed_value(amount)
 	return base_value - old_val
 
+## Sets the base value directly without any modifiers or calculations.
+func set_base_value(new_base: float) -> float:
+	return set_direct_value(new_base)
+
 ## Sets the maximum value directly without any modifiers or calculations.
 func set_max_value(new_max: float) -> float:
 	if frozen: return 0.0	
