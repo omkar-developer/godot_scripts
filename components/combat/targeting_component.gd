@@ -35,6 +35,14 @@ enum UpdateMode {
 	AUTO            ## Periodic refresh via update(delta) with cooldown
 }
 
+## Shape types for range detection
+enum ShapeType {
+	CIRCLE,      ## Circular detection range
+	RECTANGLE,   ## Rectangular detection range
+	CAPSULE,     ## Capsule detection range
+	CUSTOM       ## Custom shape (manual scaling)
+}
+
 ## Reference to the entity that owns this component (can be any Object)
 var owner: Object = null
 
@@ -78,6 +86,30 @@ var target_filter: Callable = Callable()
 
 ## Internal timer for AUTO update mode
 var _refresh_timer: float = 0.0
+
+## Current range value (affects shape size)
+var detection_range: float = 100.0:
+	set(value):
+		var old_range = detection_range
+		detection_range = value
+		if auto_update_shape:
+			_update_collision_shape(detection_range)
+		range_changed.emit(detection_range * range_multiplier, old_range * range_multiplier)
+
+## Reference to the detection shape
+var collision_shape: CollisionShape2D = null
+
+## Multiplier applied to range value
+var range_multiplier: float = 1.0
+
+## Whether to automatically update shape when range changes
+var auto_update_shape: bool = true
+
+## Type of shape being used
+var shape_type: ShapeType = ShapeType.CUSTOM
+
+## Emitted when range value changes
+signal range_changed(new_range: float, old_range: float)
 
 ## Emitted when a new target enters detection range and passes validation.[br]
 ## [param target]: The Node that entered detection.
@@ -159,6 +191,86 @@ func set_detection_area(area: Area2D) -> void:
 		
 		# Scan for existing targets in area
 		_scan_existing_targets()
+
+	_detect_collision_shape()
+
+
+## Detect and configure collision shape
+func _detect_collision_shape() -> void:
+	if not detection_area:
+		return
+	
+	for child in detection_area.get_children():
+		if child is CollisionShape2D:
+			collision_shape = child
+			break
+	
+	if not collision_shape:
+		push_warning("TargetingComponent: No CollisionShape2D found in detection_area")
+		return
+	
+	var shape = collision_shape.shape
+	if shape is CircleShape2D:
+		shape_type = ShapeType.CIRCLE
+	elif shape is RectangleShape2D:
+		shape_type = ShapeType.RECTANGLE
+	elif shape is CapsuleShape2D:
+		shape_type = ShapeType.CAPSULE
+	else:
+		shape_type = ShapeType.CUSTOM
+		push_warning("TargetingComponent: Custom shape detected, use range_changed signal for manual scaling")
+	
+	if auto_update_shape:
+		_update_collision_shape(detection_range)
+
+
+## Update collision shape size based on range
+func _update_collision_shape(range_value: float) -> void:
+	if not collision_shape or not collision_shape.shape:
+		return
+	
+	var scaled_range = range_value * range_multiplier
+	
+	match shape_type:
+		ShapeType.CIRCLE:
+			var circle = collision_shape.shape as CircleShape2D
+			circle.radius = scaled_range
+		
+		ShapeType.RECTANGLE:
+			var rect = collision_shape.shape as RectangleShape2D
+			rect.size = Vector2(scaled_range * 2, scaled_range * 2)
+		
+		ShapeType.CAPSULE:
+			var capsule = collision_shape.shape as CapsuleShape2D
+			capsule.radius = scaled_range
+			capsule.height = scaled_range * 2
+
+## Get current effective range (with multiplier)
+func get_range() -> float:
+	return detection_range * range_multiplier
+
+## Set collision shape manually
+func set_collision_shape(shape_node: CollisionShape2D) -> void:
+	collision_shape = shape_node
+	_detect_collision_shape()
+	
+	if auto_update_shape:
+		_update_collision_shape(detection_range)
+
+## Set range multiplier
+func set_range_multiplier(multiplier: float, update_shape: bool = true) -> void:
+	range_multiplier = multiplier
+	
+	if update_shape and auto_update_shape:
+		_update_collision_shape(detection_range)
+
+## Enable/disable automatic shape updates
+func set_auto_update_shape(enabled: bool) -> void:
+	auto_update_shape = enabled
+
+## Force shape update
+func force_update_shape() -> void:
+	_update_collision_shape(detection_range)
 
 
 ## Get the best target (single target mode).[br]

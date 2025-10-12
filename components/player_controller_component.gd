@@ -240,12 +240,8 @@ func _update_physics(input: Vector2, delta: float):
 	
 	if input.length_squared() > 0.01:
 		var force = input * move_force
-		physics_component.apply_force(force)
-	
-	# Limit speed
-	if movement.velocity.length() > max_speed:
-		movement.velocity = movement.velocity.normalized() * max_speed
-	
+		physics_component.apply_force(force)	
+
 	physics_component.update(delta)
 
 func get_process_delta_time() -> float:
