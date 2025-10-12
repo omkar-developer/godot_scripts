@@ -13,21 +13,21 @@ extends RefCounted
 ## [param health_component]: The health component receiving damage (for accessing stats/properties).[br]
 ## [param result]: The DamageResult being built (for setting flags like was_critical).[br]
 ## [return]: Final calculated damage amount.
-func calculate_damage(request: DamageRequest, health_component: BaseHealthComponent, result: DamageResult) -> float:
+func calculate_damage(request: DamageRequest, health_component: HealthComponent, result: DamageResult) -> float:
 	# Roll critical hit
 	result.was_critical = randf() < clampf(request.crit_chance, 0.0, 1.0)
 	var incoming := request.damage * (request.crit_damage if result.was_critical else 1.0)
 	
 	# Apply resistance by damage type
-	var resistance := health_component._get_resistance(request.damage_type)
+	var resistance = health_component._get_resistance(request.damage_type)
 	incoming *= (1.0 - clampf(resistance, 0.0, 0.9))  # Max 90% resist
 	
 	# Apply flat damage reduction (armor) - subtracts before multiplier
-	var armor := health_component._get_damage_reduction()
+	var armor = health_component._get_damage_reduction()
 	incoming = maxf(0.0, incoming - armor)
 	
 	# Apply damage multiplier (damage reduction %) - multiplies remaining damage
-	var multiplier := health_component._get_damage_multiplier()
+	var multiplier = health_component._get_damage_multiplier()
 	incoming *= multiplier
 	
 	# Apply max damage cap (static limit)

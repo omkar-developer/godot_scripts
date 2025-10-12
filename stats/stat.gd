@@ -543,6 +543,22 @@ func get_difference_from(other_stat: Stat) -> Dictionary:
 		"max_diff": max_diff
 	}
 
+## Bind stat to a callable (most flexible, fastest)
+func bind_to(callable: Callable) -> void:
+	value_changed.connect(func(nv, _nm, _ov, _om): callable.call(nv))
+	callable.call(get_value())
+
+## Binds the stat to a property on a target object.
+func bind_to_property(target: Object, property: StringName) -> void:
+	value_changed.connect(func(nv, _nm, _ov, _om):
+		target.set(property, nv)
+	)
+	target.set(property, get_value())
+
+## Binds the stat to a property on a target object.
+static func bind_property(target: Object, property: StringName, stat: Stat) -> void:
+	stat.bind_to_property(target, property)
+
 ## Returns a string representation of the stat.
 func string() -> String:
 	return "Value: %s (Base: %s, Flat: %s, Percent: %s%%)" % [
