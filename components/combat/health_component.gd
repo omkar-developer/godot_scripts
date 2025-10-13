@@ -22,6 +22,10 @@ var prevent_death_once: bool = false
 var _death_prevented: bool = false
 var immune_damage_types: Array[int] = []
 
+# Stat binding control
+var _health_stat_bound: bool = false
+var _shield_stat_bound: bool = false
+
 signal damage_taken(result: DamageResult)
 signal died()
 signal revived()
@@ -35,6 +39,16 @@ signal shield_broken(overkill: float)
 signal shield_restored(amount: float)
 signal death_prevented(request: DamageRequest)
 signal damage_immunity_triggered(damage_type: int)
+
+# Two-way binding signals for Stat integration
+signal health_value_set(value: float)
+signal health_value_added(delta: float)
+signal max_health_value_set(value: float)
+signal max_health_value_added(delta: float)
+signal shield_value_set(value: float)
+signal shield_value_added(delta: float)
+signal max_shield_value_set(value: float)
+signal max_shield_value_added(delta: float)
 
 func _init(
 	_owner: Object,
@@ -109,7 +123,14 @@ func _apply_damage(amount: float, result: DamageResult) -> void:
 		
 		if shield_value > 0.0:
 			var shield_absorbed = minf(remaining_damage, shield_value)
-			current_shield = clampf(current_shield - shield_absorbed, 0.0, max_shield)
+			
+			if _shield_stat_bound:
+				# Let stat handle the change
+				shield_value_added.emit(-shield_absorbed)
+			else:
+				# Handle locally with clamping
+				current_shield = clampf(current_shield - shield_absorbed, 0.0, max_shield)
+			
 			result.shield_damaged = shield_absorbed
 			shield_damaged.emit(shield_absorbed)
 			remaining_damage -= shield_absorbed
@@ -128,14 +149,20 @@ func _apply_damage(amount: float, result: DamageResult) -> void:
 				_death_prevented = true
 				death_prevented.emit(result.request)
 		
-		current_health = clampf(current_health - remaining_damage, 0.0, max_health)
+		if _health_stat_bound:
+			# Let stat handle the change
+			health_value_added.emit(-remaining_damage)
+		else:
+			# Handle locally with clamping
+			current_health = clampf(current_health - remaining_damage, 0.0, max_health)
+		
 		result.actual_damage = remaining_damage
 		
-		var new_health = current_health
+		var new_health = current_health if not _health_stat_bound else (old_health - remaining_damage)
 		if new_health <= 0.0:
 			result.overkill = remaining_damage - old_health
 		
-		if new_health <= 0.0 and not is_dead:
+		if current_health <= 0.0 and not is_dead:
 			is_dead = true
 			died.emit()
 	else:
@@ -146,31 +173,44 @@ func heal(amount: float) -> float:
 		return 0.0
 	
 	var old_health = current_health
-	current_health = clampf(current_health + amount, 0.0, max_health)
-	var new_health = current_health
 	
-	var actual_healed = new_health - old_health
-	if actual_healed > 0.0:
-		healed.emit(actual_healed)
+	if _health_stat_bound:
+		# Let stat handle the change
+		health_value_added.emit(amount)
+		# Actual healed will be calculated after stat updates current_health
+		return amount  # Return requested amount, actual will be in signal
+	else:
+		# Handle locally with clamping
+		current_health = clampf(current_health + amount, 0.0, max_health)
+		var actual_healed = current_health - old_health
 		
-		if is_dead and new_health > 0.0:
-			is_dead = false
-	
-	return actual_healed
+		if actual_healed > 0.0:
+			healed.emit(actual_healed)
+			
+			if is_dead and current_health > 0.0:
+				is_dead = false
+		
+		return actual_healed
 
 func restore_shield(amount: float) -> float:
 	if not shield_enabled or amount <= 0.0:
 		return 0.0
 	
 	var old_shield = current_shield
-	current_shield = clampf(current_shield + amount, 0.0, max_shield)
-	var new_shield = current_shield
 	
-	var actual_restored = new_shield - old_shield
-	if actual_restored > 0.0:
-		shield_restored.emit(actual_restored)
-	
-	return actual_restored
+	if _shield_stat_bound:
+		# Let stat handle the change
+		shield_value_added.emit(amount)
+		return amount  # Return requested amount
+	else:
+		# Handle locally with clamping
+		current_shield = clampf(current_shield + amount, 0.0, max_shield)
+		var actual_restored = current_shield - old_shield
+		
+		if actual_restored > 0.0:
+			shield_restored.emit(actual_restored)
+		
+		return actual_restored
 
 func update(delta: float) -> void:
 	if iframe_enabled and iframe_timer > 0.0:
@@ -218,7 +258,11 @@ func revive() -> void:
 	revived.emit()
 
 func force_kill() -> void:
-	current_health = 0.0
+	if _health_stat_bound:
+		health_value_set.emit(0.0)
+	else:
+		current_health = 0.0
+	
 	if not is_dead:
 		is_dead = true
 		died.emit()
@@ -276,25 +320,74 @@ func remove_resistance(damage_type: int) -> void:
 	resistances.erase(damage_type)
 
 func set_max_health(new_max: float, adjust_current: bool = false) -> void:
-	if adjust_current and max_health > 0.0:
-		var ratio = current_health / max_health
-		max_health = new_max
-		current_health = new_max * ratio
+	if _health_stat_bound:
+		max_health_value_set.emit(new_max)
+		if adjust_current and max_health > 0.0:
+			var ratio = current_health / max_health
+			health_value_set.emit(new_max * ratio)
 	else:
-		max_health = new_max
-		current_health = minf(current_health, max_health)
+		if adjust_current and max_health > 0.0:
+			var ratio = current_health / max_health
+			max_health = new_max
+			current_health = new_max * ratio
+		else:
+			max_health = new_max
+			current_health = minf(current_health, max_health)
 
 func set_max_shield(new_max: float, adjust_current: bool = false) -> void:
-	if adjust_current and max_shield > 0.0:
-		var ratio = current_shield / max_shield
-		max_shield = new_max
-		current_shield = new_max * ratio
+	if _shield_stat_bound:
+		max_shield_value_set.emit(new_max)
+		if adjust_current and max_shield > 0.0:
+			var ratio = current_shield / max_shield
+			shield_value_set.emit(new_max * ratio)
 	else:
-		max_shield = new_max
-		current_shield = minf(current_shield, max_shield)
+		if adjust_current and max_shield > 0.0:
+			var ratio = current_shield / max_shield
+			max_shield = new_max
+			current_shield = new_max * ratio
+		else:
+			max_shield = new_max
+			current_shield = minf(current_shield, max_shield)
 
 func set_health(value: float) -> void:
-	current_health = clampf(value, 0.0, max_health)
+	if _health_stat_bound:
+		health_value_set.emit(value)
+	else:
+		current_health = clampf(value, 0.0, max_health)
 
 func set_shield(value: float) -> void:
-	current_shield = clampf(value, 0.0, max_shield)
+	if _shield_stat_bound:
+		shield_value_set.emit(value)
+	else:
+		current_shield = clampf(value, 0.0, max_shield)
+
+# Stat binding helpers
+func bind_health_stat(stat) -> void:
+	if not stat.has_method("bind_to_property"):
+		push_error("bind_health_stat: object doesn't have bind_to_property method")
+		return
+	
+	_health_stat_bound = true
+	stat.bind_to_property(self, "current_health", "health_value_set", "health_value_added")
+	stat.bind_max_to_property(self, "max_health", "max_health_value_set", "max_health_value_added")
+
+func bind_shield_stat(stat) -> void:
+	if not stat.has_method("bind_to_property"):
+		push_error("bind_shield_stat: object doesn't have bind_to_property method")
+		return
+	
+	_shield_stat_bound = true
+	stat.bind_to_property(self, "current_shield", "shield_value_set", "shield_value_added")
+	stat.bind_max_to_property(self, "max_shield", "max_shield_value_set", "max_shield_value_added")
+
+func unbind_health_stat() -> void:
+	_health_stat_bound = false
+
+func unbind_shield_stat() -> void:
+	_shield_stat_bound = false
+
+func is_health_stat_bound() -> bool:
+	return _health_stat_bound
+
+func is_shield_stat_bound() -> bool:
+	return _shield_stat_bound

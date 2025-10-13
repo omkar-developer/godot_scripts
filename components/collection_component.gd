@@ -1,22 +1,22 @@
 class_name CollectionComponent
 extends RefCounted
 
-## Automatic pickup/collection component for Area2D-based detection.[br]
+## Two-area collection system: detection range + collection trigger.[br]
 ##[br]
-## This component detects and collects items (coins, XP orbs, powerups, etc.)[br]
-## using an Area2D. Supports automatic collection, manual collection with filters,[br]
-## magnetic attraction, and various collection modes. Similar to TargetingComponent[br]
-## but specialized for collectible items rather than combat targets.
+## Uses two separate Area2D nodes:[br]
+## - Detection Area: Large area for detecting items, magnetic pull, filtering[br]
+## - Collection Area: Small area (e.g. ship collision) for actual pickup[br]
+## This allows ship collision to remain small while collection range is large.
 
-## Collection mode determines how items are collected
+## Collection mode determines behavior
 enum CollectionMode {
-	AUTOMATIC,     ## Auto-collect on contact
+	AUTOMATIC,     ## Auto-collect when items enter collection_area
 	MANUAL,        ## Require manual collect() call
 	ON_INPUT,      ## Collect when input action pressed
-	MAGNETIC       ## Items are attracted then collected
+	MAGNETIC       ## Items pulled to player, collected on collection_area contact
 }
 
-## Shape types for collection range
+## Shape types for range detection
 enum ShapeType {
 	CIRCLE,
 	RECTANGLE,
@@ -27,19 +27,25 @@ enum ShapeType {
 ## Reference to the entity that owns this component
 var owner: Object = null
 
-## Area2D used for item detection
+## Large area for item DETECTION and magnetic pull
 var detection_area: Area2D = null
 
-## Current collection mode
-var collection_mode: CollectionMode = CollectionMode.AUTOMATIC
+## Small area for actual COLLECTION (e.g. ship collision area)
+var collection_area: Area2D = null
 
-## List of collectible items in range
-var items_in_range: Array[Node] = []
+## Current collection mode
+var collection_mode: CollectionMode = CollectionMode.MAGNETIC
+
+## Items detected in range (can be pulled)
+var detected_items: Array[Node] = []
+
+## Items in collection range (ready to collect)
+var collectible_items: Array[Node] = []
 
 ## Whether to automatically remove invalid items
 var auto_cleanup: bool = true
 
-## Maximum items that can be collected per frame (0 = unlimited)
+## Maximum items collected per frame (0 = unlimited)
 var max_per_frame: int = 0
 
 ## Collection filter function: func(item: Node) -> bool
@@ -48,23 +54,23 @@ var collection_filter: Callable = Callable()
 ## Input action for ON_INPUT mode
 var input_action: String = "interact"
 
-## Whether to detect bodies (RigidBody2D, CharacterBody2D, etc.)
+## Whether to detect bodies in detection area
 var detect_bodies: bool = true
 
-## Whether to detect areas (Area2D)
+## Whether to detect areas in detection area
 var detect_areas: bool = true
 
-## Maximum number of items in range (0 = unlimited)
-var max_items_in_range: int = 0
+## Maximum items in detection range (0 = unlimited)
+var max_detected_items: int = 0
 
 ## Magnetic attraction settings
-var magnetic_enabled: bool = false
-var magnetic_strength: float = 200.0
-var magnetic_max_speed: float = 300.0
-var magnetic_acceleration: float = 500.0
+var magnetic_enabled: bool = true
+var magnetic_strength: float = 300.0
+var magnetic_max_speed: float = 400.0
+var magnetic_min_distance: float = 5.0  # Stop pulling when this close
 
-## Collection range and shape management
-var detection_range: float = 50.0:
+## Detection range management
+var detection_range: float = 150.0:
 	set(value):
 		var old_range = detection_range
 		detection_range = value
@@ -77,91 +83,97 @@ var range_multiplier: float = 1.0
 var auto_update_shape: bool = true
 var shape_type: ShapeType = ShapeType.CUSTOM
 
-## Emitted when an item is collected.[br]
-## [param item]: The Node that was collected.[br]
-## [param item_type]: String type identifier if item has "item_type" property.
+## Emitted when an item is collected
 signal item_collected(item: Node, item_type: String)
 
-## Emitted when an item enters collection range.[br]
-## [param item]: The Node that entered range.
+## Emitted when an item enters detection range
 signal item_detected(item: Node)
 
-## Emitted when an item leaves collection range.[br]
-## [param item]: The Node that left range.
+## Emitted when an item leaves detection range
 signal item_lost(item: Node)
 
-## Emitted when collection attempt fails (invalid item, filter rejected, etc.).[br]
-## [param item]: The Node that failed to be collected.
+## Emitted when an item enters collection range
+signal item_ready_to_collect(item: Node)
+
+## Emitted when collection fails
 signal collection_failed(item: Node)
 
-## Emitted when items_in_range reaches max limit.[br]
-## [param rejected_item]: The item that couldn't be added.
-signal item_limit_reached(rejected_item: Node)
+## Emitted when detection limit reached
+signal detection_limit_reached(rejected_item: Node)
 
 ## Emitted when range changes
 signal range_changed(new_range: float, old_range: float)
 
 
-func _init(_owner: Object, _area: Area2D = null, _mode: CollectionMode = CollectionMode.AUTOMATIC) -> void:
+func _init(
+	_owner: Object,
+	_detection_area: Area2D = null,
+	_collection_area: Area2D = null,
+	_mode: CollectionMode = CollectionMode.MAGNETIC
+) -> void:
 	owner = _owner
 	collection_mode = _mode
 	
-	if _area:
-		set_detection_area(_area)
-	else:
-		_auto_detect_area()
+	if _detection_area:
+		set_detection_area(_detection_area)
+	
+	if _collection_area:
+		set_collection_area(_collection_area)
+	elif _detection_area:
+		# Default: use detection area as collection area too
+		set_collection_area(_detection_area)
 
 
-## Internal: Try to auto-detect Area2D from owner
-func _auto_detect_area() -> void:
-	if not owner is Node:
-		return
-	
-	var owner_node = owner as Node
-	
-	# Check if owner is Area2D
-	if owner_node is Area2D:
-		set_detection_area(owner_node)
-		return
-	
-	# Check children
-	for child in owner_node.get_children():
-		if child is Area2D:
-			set_detection_area(child)
-			return
-	
-	# Check parent
-	var parent = owner_node.get_parent()
-	if parent and parent is Area2D:
-		set_detection_area(parent)
-
-
-## Set or change the detection area.[br]
-## [param area]: The Area2D to use for detection.
+## Set the detection area (large range for item detection).[br]
+## [param area]: Area2D for detecting items at distance.
 func set_detection_area(area: Area2D) -> void:
 	# Disconnect old area
 	if detection_area and is_instance_valid(detection_area):
-		if detect_bodies and detection_area.body_entered.is_connected(_on_body_entered):
-			detection_area.body_entered.disconnect(_on_body_entered)
-			detection_area.body_exited.disconnect(_on_body_exited)
-		if detect_areas and detection_area.area_entered.is_connected(_on_area_entered):
-			detection_area.area_entered.disconnect(_on_area_entered)
-			detection_area.area_exited.disconnect(_on_area_exited)
+		if detect_bodies and detection_area.body_entered.is_connected(_on_detection_body_entered):
+			detection_area.body_entered.disconnect(_on_detection_body_entered)
+			detection_area.body_exited.disconnect(_on_detection_body_exited)
+		if detect_areas and detection_area.area_entered.is_connected(_on_detection_area_entered):
+			detection_area.area_entered.disconnect(_on_detection_area_entered)
+			detection_area.area_exited.disconnect(_on_detection_area_exited)
 	
 	detection_area = area
 	
 	# Connect new area
 	if detection_area:
 		if detect_bodies:
-			detection_area.body_entered.connect(_on_body_entered)
-			detection_area.body_exited.connect(_on_body_exited)
+			detection_area.body_entered.connect(_on_detection_body_entered)
+			detection_area.body_exited.connect(_on_detection_body_exited)
 		if detect_areas:
-			detection_area.area_entered.connect(_on_area_entered)
-			detection_area.area_exited.connect(_on_area_exited)
+			detection_area.area_entered.connect(_on_detection_area_entered)
+			detection_area.area_exited.connect(_on_detection_area_exited)
 		
-		_scan_existing_items()
+		_scan_existing_detected()
 	
 	_detect_collision_shape()
+
+
+## Set the collection area (small trigger for actual pickup).[br]
+## [param area]: Area2D that triggers collection (e.g. ship collision).
+func set_collection_area(area: Area2D) -> void:
+	# Disconnect old area
+	if collection_area and is_instance_valid(collection_area):
+		if collection_area.body_entered.is_connected(_on_collection_body_entered):
+			collection_area.body_entered.disconnect(_on_collection_body_entered)
+			collection_area.body_exited.disconnect(_on_collection_body_exited)
+		if collection_area.area_entered.is_connected(_on_collection_area_entered):
+			collection_area.area_entered.disconnect(_on_collection_area_entered)
+			collection_area.area_exited.disconnect(_on_collection_area_exited)
+	
+	collection_area = area
+	
+	# Connect new area
+	if collection_area:
+		collection_area.body_entered.connect(_on_collection_body_entered)
+		collection_area.body_exited.connect(_on_collection_body_exited)
+		collection_area.area_entered.connect(_on_collection_area_entered)
+		collection_area.area_exited.connect(_on_collection_area_exited)
+		
+		_scan_existing_collectible()
 
 
 ## Update component (call in _process or _physics_process).[br]
@@ -171,7 +183,7 @@ func update(delta: float) -> void:
 		_cleanup_invalid_items()
 	
 	# Handle magnetic attraction
-	if magnetic_enabled and collection_mode == CollectionMode.MAGNETIC:
+	if magnetic_enabled:
 		_update_magnetic_attraction(delta)
 	
 	# Handle input-based collection
@@ -180,15 +192,19 @@ func update(delta: float) -> void:
 			collect_all()
 
 
-## Manually collect a specific item.[br>
+## Manually collect a specific item.[br]
 ## [param item]: The Node to collect.[br]
 ## [return]: true if successfully collected.
 func collect_item(item: Node) -> bool:
 	if not is_instance_valid(item):
 		return false
 	
-	# Check if in range
-	if not items_in_range.has(item):
+	# Check if in collectible range (or allow from detected if manual mode)
+	var in_range = collectible_items.has(item)
+	if not in_range and collection_mode != CollectionMode.MANUAL:
+		return false
+	
+	if collection_mode == CollectionMode.MANUAL and not detected_items.has(item):
 		return false
 	
 	# Apply filter
@@ -201,7 +217,8 @@ func collect_item(item: Node) -> bool:
 	var item_type = _get_item_type(item)
 	
 	# Remove from tracking
-	items_in_range.erase(item)
+	detected_items.erase(item)
+	collectible_items.erase(item)
 	
 	# Emit signal before destroying item
 	item_collected.emit(item, item_type)
@@ -212,17 +229,16 @@ func collect_item(item: Node) -> bool:
 	return true
 
 
-## Collect all items currently in range.[br]
+## Collect all items in collection range.[br]
 ## [param respect_max_per_frame]: Whether to honor max_per_frame limit.[br]
 ## [return]: Number of items collected.
 func collect_all(respect_max_per_frame: bool = true) -> int:
 	var collected = 0
-	var limit = max_per_frame if respect_max_per_frame and max_per_frame > 0 else items_in_range.size()
+	var limit = max_per_frame if respect_max_per_frame and max_per_frame > 0 else collectible_items.size()
 	
-	# Collect up to limit
-	var i = items_in_range.size() - 1
+	var i = collectible_items.size() - 1
 	while i >= 0 and collected < limit:
-		var item = items_in_range[i]
+		var item = collectible_items[i]
 		if collect_item(item):
 			collected += 1
 		i -= 1
@@ -230,10 +246,10 @@ func collect_all(respect_max_per_frame: bool = true) -> int:
 	return collected
 
 
-## Collect closest item in range.[br]
+## Collect closest item in detection range.[br]
 ## [return]: The collected item, or null if none available.
 func collect_closest() -> Node:
-	if items_in_range.is_empty():
+	if detected_items.is_empty():
 		return null
 	
 	var closest = _get_closest_item()
@@ -243,40 +259,48 @@ func collect_closest() -> Node:
 	return null
 
 
-## Get all items currently in collection range.[br]
-## [return]: Array of item Nodes.
-func get_items_in_range() -> Array[Node]:
-	return items_in_range.duplicate()
+## Get all detected items.[br]
+## [return]: Array of detected item Nodes.
+func get_detected_items() -> Array[Node]:
+	return detected_items.duplicate()
 
 
-## Get count of items in range.[br]
-## [return]: Number of items.
-func get_item_count() -> int:
-	return items_in_range.size()
+## Get all collectible items (in collection range).[br]
+## [return]: Array of collectible item Nodes.
+func get_collectible_items() -> Array[Node]:
+	return collectible_items.duplicate()
 
 
-## Check if a specific item is in range.[br]
+## Get count of detected items.[br]
+## [return]: Number of items in detection range.
+func get_detected_count() -> int:
+	return detected_items.size()
+
+
+## Get count of collectible items.[br]
+## [return]: Number of items in collection range.
+func get_collectible_count() -> int:
+	return collectible_items.size()
+
+
+## Check if item is detected.[br]
 ## [param item]: The Node to check.[br]
-## [return]: true if item is in items_in_range.
-func has_item(item: Node) -> bool:
-	return items_in_range.has(item)
+## [return]: true if in detection range.
+func has_detected(item: Node) -> bool:
+	return detected_items.has(item)
+
+
+## Check if item is collectible.[br]
+## [param item]: The Node to check.[br]
+## [return]: true if in collection range.
+func has_collectible(item: Node) -> bool:
+	return collectible_items.has(item)
 
 
 ## Set collection filter function.[br]
-## [param filter_func]: Callable with signature func(item: Node) -> bool.[br]
-## [param revalidate_existing]: Whether to remove existing items that fail filter.
-func set_collection_filter(filter_func: Callable, revalidate_existing: bool = false) -> void:
+## [param filter_func]: Callable with signature func(item: Node) -> bool.
+func set_collection_filter(filter_func: Callable) -> void:
 	collection_filter = filter_func
-	
-	if revalidate_existing and collection_filter.is_valid():
-		var to_remove: Array[Node] = []
-		for item in items_in_range:
-			if not collection_filter.call(item):
-				to_remove.append(item)
-		
-		for item in to_remove:
-			items_in_range.erase(item)
-			item_lost.emit(item)
 
 
 ## Clear the collection filter.
@@ -291,51 +315,59 @@ func set_collection_mode(mode: CollectionMode) -> void:
 
 
 ## Enable/disable magnetic attraction.[br]
-## [param enabled]: Whether magnetic collection is active.
+## [param enabled]: Whether magnetic pull is active.
 func set_magnetic_enabled(enabled: bool) -> void:
 	magnetic_enabled = enabled
 
 
-## Set magnetic strength (acceleration toward collector).[br]
+## Set magnetic strength.[br]
 ## [param strength]: Attraction strength in pixels/second^2.
 func set_magnetic_strength(strength: float) -> void:
 	magnetic_strength = strength
 
 
-## Clear all items from tracking.[br]
-## [param emit_signals]: Whether to emit item_lost for each item.
-func clear_items(emit_signals: bool = false) -> void:
+## Clear all items.[br]
+## [param emit_signals]: Whether to emit signals.
+func clear_all_items(emit_signals: bool = false) -> void:
 	if emit_signals:
-		for item in items_in_range:
+		for item in detected_items:
 			item_lost.emit(item)
 	
-	items_in_range.clear()
+	detected_items.clear()
+	collectible_items.clear()
 
 
-## Internal: Handle body entering detection
-func _on_body_entered(body: Node) -> void:
-	_handle_item_entered(body)
+## Internal: Handle item entering DETECTION area
+func _on_detection_body_entered(body: Node) -> void:
+	_handle_detected(body)
+
+func _on_detection_area_entered(area: Node) -> void:
+	_handle_detected(area)
+
+func _on_detection_body_exited(body: Node) -> void:
+	_handle_detection_lost(body)
+
+func _on_detection_area_exited(area: Node) -> void:
+	_handle_detection_lost(area)
 
 
-## Internal: Handle area entering detection
-func _on_area_entered(area: Node) -> void:
-	_handle_item_entered(area)
+## Internal: Handle item entering COLLECTION area
+func _on_collection_body_entered(body: Node) -> void:
+	_handle_collectible(body)
+
+func _on_collection_area_entered(area: Node) -> void:
+	_handle_collectible(area)
+
+func _on_collection_body_exited(body: Node) -> void:
+	_handle_collection_lost(body)
+
+func _on_collection_area_exited(area: Node) -> void:
+	_handle_collection_lost(area)
 
 
-## Internal: Handle body exiting detection
-func _on_body_exited(body: Node) -> void:
-	_handle_item_exited(body)
-
-
-## Internal: Handle area exiting detection
-func _on_area_exited(area: Node) -> void:
-	_handle_item_exited(area)
-
-
-## Internal: Common logic for item entering range
-func _handle_item_entered(item: Node) -> void:
-	# Avoid duplicates
-	if items_in_range.has(item):
+## Internal: Item detected (entered detection range)
+func _handle_detected(item: Node) -> void:
+	if detected_items.has(item):
 		return
 	
 	# Apply filter
@@ -343,80 +375,114 @@ func _handle_item_entered(item: Node) -> void:
 		if not collection_filter.call(item):
 			return
 	
-	# Check max items limit
-	if max_items_in_range > 0 and items_in_range.size() >= max_items_in_range:
-		item_limit_reached.emit(item)
+	# Check limit
+	if max_detected_items > 0 and detected_items.size() >= max_detected_items:
+		detection_limit_reached.emit(item)
 		return
 	
-	items_in_range.append(item)
+	detected_items.append(item)
 	item_detected.emit(item)
+
+
+## Internal: Item lost from detection
+func _handle_detection_lost(item: Node) -> void:
+	if detected_items.has(item):
+		detected_items.erase(item)
+		item_lost.emit(item)
+
+
+## Internal: Item entered collection range
+func _handle_collectible(item: Node) -> void:
+	# Must be detected first
+	if not detected_items.has(item):
+		return
+	
+	if collectible_items.has(item):
+		return
+	
+	collectible_items.append(item)
+	item_ready_to_collect.emit(item)
 	
 	# Auto-collect if in automatic mode
 	if collection_mode == CollectionMode.AUTOMATIC:
 		collect_item(item)
 
 
-## Internal: Common logic for item exiting range
-func _handle_item_exited(item: Node) -> void:
-	if items_in_range.has(item):
-		items_in_range.erase(item)
-		item_lost.emit(item)
+## Internal: Item left collection range
+func _handle_collection_lost(item: Node) -> void:
+	collectible_items.erase(item)
 
 
-## Internal: Scan for items already in area
-func _scan_existing_items() -> void:
+## Internal: Scan existing items in detection area
+func _scan_existing_detected() -> void:
 	if not detection_area:
 		return
 	
 	if detect_bodies:
-		var bodies = detection_area.get_overlapping_bodies()
-		for body in bodies:
-			_handle_item_entered(body)
+		for body in detection_area.get_overlapping_bodies():
+			_handle_detected(body)
 	
 	if detect_areas:
-		var areas = detection_area.get_overlapping_areas()
-		for area in areas:
-			_handle_item_entered(area)
+		for area in detection_area.get_overlapping_areas():
+			_handle_detected(area)
 
 
-## Internal: Update magnetic attraction for all items
+## Internal: Scan existing items in collection area
+func _scan_existing_collectible() -> void:
+	if not collection_area:
+		return
+	
+	for body in collection_area.get_overlapping_bodies():
+		_handle_collectible(body)
+	
+	for area in collection_area.get_overlapping_areas():
+		_handle_collectible(area)
+
+
+## Internal: Update magnetic attraction
 func _update_magnetic_attraction(delta: float) -> void:
 	if not owner is Node2D:
 		return
 	
 	var owner_pos = (owner as Node2D).global_position
 	
-	for item in items_in_range:
+	for item in detected_items:
 		if not is_instance_valid(item) or not item is Node2D:
 			continue
 		
+		# Don't pull if already in collection range
+		if collectible_items.has(item):
+			continue
+		
 		var item_node = item as Node2D
-		var direction = (owner_pos - item_node.global_position).normalized()
-		var distance = owner_pos.distance_to(item_node.global_position)
+		var to_player = owner_pos - item_node.global_position
+		var distance = to_player.length()
 		
-		# Calculate attraction force (stronger when closer)
-		var force_multiplier = 1.0 + (1.0 - clampf(distance / get_range(), 0.0, 1.0))
-		var velocity = direction * magnetic_strength * force_multiplier * delta
+		# Stop pulling when very close (let collection area handle it)
+		if distance < magnetic_min_distance:
+			continue
 		
-		# Apply velocity (check if item has position property)
-		if "global_position" in item_node:
-			item_node.global_position += velocity.limit_length(magnetic_max_speed * delta)
+		var direction = to_player.normalized()
 		
-		# Auto-collect when very close
-		if distance < 10.0:
-			collect_item(item)
+		# Stronger pull when closer
+		var distance_factor = 1.0 - clampf(distance / get_range(), 0.0, 1.0)
+		var pull_force = magnetic_strength * (1.0 + distance_factor) * delta
+		
+		# Apply movement
+		var velocity = direction * pull_force
+		item_node.global_position += velocity.limit_length(magnetic_max_speed * delta)
 
 
-## Internal: Get closest item by distance
+## Internal: Get closest detected item
 func _get_closest_item() -> Node:
 	if not owner is Node2D:
-		return items_in_range[0] if not items_in_range.is_empty() else null
+		return detected_items[0] if not detected_items.is_empty() else null
 	
 	var owner_node = owner as Node2D
 	var closest: Node = null
 	var min_dist = INF
 	
-	for item in items_in_range:
+	for item in detected_items:
 		if not is_instance_valid(item) or not item is Node2D:
 			continue
 		
@@ -433,44 +499,54 @@ func _get_closest_item() -> Node:
 func _get_item_type(item: Node) -> String:
 	if "item_type" in item:
 		return item.get("item_type")
+	elif item.has_meta("item_type"):
+		return item.get_meta("item_type")
 	elif "type" in item:
 		return item.get("type")
 	else:
 		return item.name
 
 
-## Internal: Destroy or hide collected item
+## Internal: Destroy collected item
 func _destroy_item(item: Node) -> void:
 	if not is_instance_valid(item):
 		return
 	
-	# Check if item has custom collection behavior
 	if item.has_method("on_collected"):
 		item.call("on_collected")
 		return
 	
-	# Default: queue_free the item
 	if item.has_method("queue_free"):
 		item.queue_free()
 
 
-## Internal: Remove invalid items from list
+## Internal: Cleanup invalid items
 func _cleanup_invalid_items() -> int:
 	var removed = 0
-	var i = items_in_range.size() - 1
 	
+	# Clean detected items
+	var i = detected_items.size() - 1
 	while i >= 0:
-		var item = items_in_range[i]
+		var item = detected_items[i]
 		if not is_instance_valid(item):
-			items_in_range.remove_at(i)
+			detected_items.remove_at(i)
 			item_lost.emit(item)
+			removed += 1
+		i -= 1
+	
+	# Clean collectible items
+	i = collectible_items.size() - 1
+	while i >= 0:
+		var item = collectible_items[i]
+		if not is_instance_valid(item):
+			collectible_items.remove_at(i)
 			removed += 1
 		i -= 1
 	
 	return removed
 
 
-## Detect and configure collision shape
+## Internal: Detect and configure collision shape
 func _detect_collision_shape() -> void:
 	if not detection_area:
 		return
@@ -481,7 +557,7 @@ func _detect_collision_shape() -> void:
 			break
 	
 	if not collision_shape:
-		push_warning("CollectionComponent: No CollisionShape2D found")
+		push_warning("CollectionComponentV2: No CollisionShape2D found in detection_area")
 		return
 	
 	var shape = collision_shape.shape
@@ -498,7 +574,7 @@ func _detect_collision_shape() -> void:
 		_update_collision_shape(detection_range)
 
 
-## Update collision shape size
+## Internal: Update collision shape size
 func _update_collision_shape(range_value: float) -> void:
 	if not collision_shape or not collision_shape.shape:
 		return

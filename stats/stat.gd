@@ -548,12 +548,35 @@ func bind_to(callable: Callable) -> void:
 	value_changed.connect(func(nv, _nm, _ov, _om): callable.call(nv))
 	callable.call(get_value())
 
-## Binds the stat to a property on a target object.
-func bind_to_property(target: Object, property: StringName) -> void:
+## Binds the stat to a property on a target object.[br]
+## for 2 way Bind provide signal name with 1 vale parameter signal.
+func bind_to_property(target: Object, property: StringName, set_value_signal: StringName = "", add_value_signal: StringName = "") -> void:
 	value_changed.connect(func(nv, _nm, _ov, _om):
 		target.set(property, nv)
 	)
+
+	if not set_value_signal.is_empty():
+		target.connect(set_value_signal, Callable(self, "set_direct_value"))
+	
+	if not add_value_signal.is_empty():
+		target.connect(add_value_signal, Callable(self, "add_value"))
+
 	target.set(property, get_value())
+
+## Binds the stat to a property on a target object.[br]
+## for 2 way Bind provide signal name with 1 vale parameter signal.
+func bind_max_to_property(target: Object, property: StringName, set_max_value_signal: StringName = "", add_max_value_signal: StringName = "") -> void:
+	value_changed.connect(func(_nv, nm, _ov, _om):
+		target.set(property, nm)
+	)
+
+	if not set_max_value_signal.is_empty():
+		target.connect(set_max_value_signal, Callable(self, "set_max_value"))
+	
+	if not add_max_value_signal.is_empty():
+		target.connect(add_max_value_signal, Callable(self, "add_max_value"))
+
+	target.set(property, get_max())
 
 ## Binds the stat to a property on a target object.
 static func bind_property(target: Object, property: StringName, stat: Stat) -> void:
