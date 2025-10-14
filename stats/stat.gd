@@ -320,15 +320,15 @@ func on_value_changed() -> void:
 ## [param _max_flat_modifier]: Initial max flat modifier (default: 0.0).
 func _init(_base_value = 0.0, _base_value_clamped = false, _min_value = 0.0, _max_value = 100.0, _final_value_clamped = false, _flat_modifier = 0.0, _percent_modifier = 0.0, _max_percent_modifier = 0.0, _max_flat_modifier = 0.0) -> void:
 	_enable_signal = false
-	self.base_value_clamped = _base_value_clamped
-	self.final_value_clamped = _final_value_clamped
-	self.base_value = _base_value
-	self.min_value = _min_value
 	self.max_value = _max_value
-	self.percent_modifier = _percent_modifier
-	self.flat_modifier = _flat_modifier
+	self.min_value = _min_value
+	self.base_value = _base_value	
 	self.max_percent_modifier = _max_percent_modifier
 	self.max_flat_modifier = _max_flat_modifier
+	self.percent_modifier = _percent_modifier
+	self.flat_modifier = _flat_modifier	
+	self.base_value_clamped = _base_value_clamped
+	self.final_value_clamped = _final_value_clamped
 	_enable_signal = true
 
 ## Returns the calculated value of the stat.[br]
