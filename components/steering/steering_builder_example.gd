@@ -69,6 +69,7 @@ func setup_ai_behavior():
 func _process(delta):
 	$Target.position = get_global_mouse_position()
 	steering_manager_component.update(delta)
+	movement_component.update(delta)
 	look_component.update(delta)
 
 # Dynamic behavior switching

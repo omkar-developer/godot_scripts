@@ -27,8 +27,6 @@ func update(delta: float):
 		if time_since_update >= update_interval:
 			update_direction()
 			time_since_update = 0.0
-	
-	movement.update(delta)
 
 func update_direction():
 	if is_instance_valid(target):

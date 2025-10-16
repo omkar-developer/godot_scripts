@@ -64,8 +64,5 @@ func update(delta: float):
 	# Limit velocity using the function from MovementComponent
 	movement.limit_velocity()
 	
-	# Update movement component
-	movement.update(delta)
-
 	# Reset frame-based acceleration
 	acceleration = Vector2.ZERO

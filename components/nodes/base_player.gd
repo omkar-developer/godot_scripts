@@ -90,8 +90,8 @@ var collection_area: Area2D = null
 var targeting_area: Area2D = null
 
 ## UI References (optional - can be bound externally)
-var health_bar: TextureProgressBar = null
-var energy_bar: TextureProgressBar = null
+var health_bar: Range = null
+var energy_bar: Range = null
 
 #endregion
 
@@ -207,9 +207,7 @@ func _setup_ui_bindings() -> void:
 
 #region Update Loop
 
-func _process(delta: float) -> void:
-	super._process(delta)
-	
+func _process(delta: float) -> void:	
 	# Update player-specific components
 	if controller:
 		controller.update(delta)
@@ -222,6 +220,8 @@ func _process(delta: float) -> void:
 	
 	if targeting_component:
 		targeting_component.update(delta)
+	
+	super._process(delta)
 
 #endregion
 

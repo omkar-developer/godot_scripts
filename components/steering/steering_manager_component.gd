@@ -23,4 +23,3 @@ func update(delta: float):
 	
 	movement.velocity += total_force * delta
 	movement.limit_velocity()
-	movement.update(delta)

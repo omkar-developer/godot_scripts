@@ -2,7 +2,7 @@ class_name FlowFieldComponent
 extends RefCounted
 
 ## Component that makes MovementComponent follow a flow field
-## Requires: MovementComponent (https://github.com/your-repo/movement-component)
+## Requires: MovementComponent
 ## Usage:
 ##   var movement = MovementComponent.new(self, 100.0)
 ##   var flowfield = FlowFieldComponent.new(movement, flow_field_manager)
