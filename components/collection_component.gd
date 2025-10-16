@@ -515,9 +515,8 @@ func _destroy_item(item: Node) -> void:
 	if item.has_method("on_collected"):
 		item.call("on_collected")
 		return
-	
-	if item.has_method("queue_free"):
-		item.queue_free()
+
+	item.queue_free()
 
 
 ## Internal: Cleanup invalid items

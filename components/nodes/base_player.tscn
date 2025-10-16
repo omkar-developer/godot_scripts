@@ -1,0 +1,73 @@
+[gd_scene load_steps=7 format=3 uid="uid://oe3nw4w062se"]
+
+[ext_resource type="Script" uid="uid://clnxiwbjs7roq" path="res://scripts/components/nodes/base_player.gd" id="1_jtrcx"]
+[ext_resource type="Texture2D" uid="uid://cjddrexmtwuvg" path="res://test_assets/kenney_space-shooter-redux/PNG/playerShip2_blue.png" id="2_210ro"]
+[ext_resource type="PackedScene" uid="uid://bcnat36nssaab" path="res://tests/stat_bar_view.tscn" id="3_63tw1"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_mvm8k"]
+radius = 19.026299
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_8djj4"]
+radius = 60.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_l23s0"]
+radius = 148.27676
+
+[node name="BasePlayer" type="Area2D"]
+collision_mask = 0
+monitoring = false
+script = ExtResource("1_jtrcx")
+collection_range = 300.0
+
+[node name="CollectionShape" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_mvm8k")
+debug_color = Color(0.9889155, 0, 0.30185252, 0.41960785)
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+scale = Vector2(0.5, 0.5)
+texture = ExtResource("2_210ro")
+
+[node name="CollectionDetectionArea" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 4
+monitorable = false
+
+[node name="DetectionShape" type="CollisionShape2D" parent="CollectionDetectionArea"]
+shape = SubResource("CircleShape2D_8djj4")
+
+[node name="CollectionArea" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 4
+monitorable = false
+
+[node name="CollectionShape" type="CollisionShape2D" parent="CollectionArea"]
+shape = SubResource("CircleShape2D_mvm8k")
+debug_color = Color(0.24009842, 0.5075265, 1, 0.41960785)
+
+[node name="TargetingArea" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 2
+monitorable = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="TargetingArea"]
+shape = SubResource("CircleShape2D_l23s0")
+debug_color = Color(4.5724212e-07, 0.6484288, 0.19096345, 0.41960785)
+
+[node name="HUD" type="Node2D" parent="."]
+top_level = true
+
+[node name="HealthBar" parent="HUD" instance=ExtResource("3_63tw1")]
+unique_name_in_owner = true
+self_modulate = Color(1, 1, 1, 0.342)
+scale = Vector2(0.3, 0.3)
+
+[node name="EnergyBar" parent="HUD" instance=ExtResource("3_63tw1")]
+unique_name_in_owner = true
+self_modulate = Color(1, 1, 1, 0.38200003)
+scale = Vector2(-0.3, 0.3)
+tint_progress = Color(0.3043412, 0.45077437, 1, 1)
+
+[node name="RemoteTransform2D" type="RemoteTransform2D" parent="."]
+remote_path = NodePath("../HUD")
+update_rotation = false
+update_scale = false

@@ -267,7 +267,7 @@ func toggle_pause() -> void:
 ## [param scene_index]: Index of scene to spawn (-1 = use spawn_scene or random).[br]
 ## [param position]: Optional position override (null = use spawn area).[br]
 ## [return]: Spawned entity Node, or null if failed.
-func spawn_entity(scene_index: int = -1, position: Variant = null) -> Node:
+func spawn_entity(scene_index: int = -1, spawn_position: Variant = null) -> Node:
 	var scene := _get_spawn_scene(scene_index)
 	if not scene:
 		push_warning("SpawnerComponent: No spawn scene available")
@@ -286,8 +286,8 @@ func spawn_entity(scene_index: int = -1, position: Variant = null) -> Node:
 	
 	# Set position
 	if entity is Node2D:
-		if position != null and position is Vector2:
-			entity.global_position = position
+		if spawn_position != null and spawn_position is Vector2:
+			entity.global_position = spawn_position
 		else:
 			entity.global_position = _get_spawn_position()
 	
