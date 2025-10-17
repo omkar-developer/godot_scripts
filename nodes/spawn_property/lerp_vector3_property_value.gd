@@ -5,5 +5,5 @@ extends SpawnPropertyValue
 @export var end_value: Vector3 = Vector3.ONE
 
 func get_value(x_value: float) -> Variant:
-	var t := clamp(x_value, 0.0, 1.0)
+	var t = clamp(x_value, 0.0, 1.0)
 	return start_value.lerp(end_value, t)

@@ -5,7 +5,7 @@ extends SpawnPropertyValue
 @export var value_multiplier: float = 1.0
 @export var value_offset: float = 0.0
 
-func get_value(x_value: float) -> Variant:
+func get_value(_x_value: float) -> Variant:
 	if not curve:
 		push_warning("RandomCurvePropertyValue: No curve assigned")
 		return 0.0

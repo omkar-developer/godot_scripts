@@ -5,5 +5,5 @@ extends SpawnPropertyValue
 @export var end_color: Color = Color.BLACK
 
 func get_value(x_value: float) -> Variant:
-	var t := clamp(x_value, 0.0, 1.0)
+	var t = clamp(x_value, 0.0, 1.0)
 	return start_color.lerp(end_color, t)

@@ -3,7 +3,7 @@ extends SpawnPropertyValue
 
 @export var weighted_choices: Dictionary = {}
 
-func get_value(x_value: float) -> Variant:
+func get_value(_x_value: float) -> Variant:
 	if weighted_choices.is_empty():
 		return null
 	
