@@ -30,10 +30,10 @@ extends BaseEntity
 @export var collection_range: float = 150.0:
 	set(value):
 		collection_range = value
-		if collection_component:
-			collection_component.detection_range = value
+		if collection_range_stat:
+			collection_range_stat.set_base_value(value)
 	get:
-		return collection_component.detection_range if collection_component else collection_range
+		return collection_range_stat.get_value() if collection_range_stat else collection_range
 
 @export var magnetic_collection: bool = true:
 	set(value):
@@ -46,10 +46,10 @@ extends BaseEntity
 @export var magnetic_strength: float = 400.0:
 	set(value):
 		magnetic_strength = value
-		if collection_component:
-			collection_component.magnetic_strength = value
+		if magnetic_strength_stat:
+			magnetic_strength_stat.set_base_value(value)
 	get:
-		return collection_component.magnetic_strength if collection_component else magnetic_strength
+		return magnetic_strength_stat.get_value() if magnetic_strength_stat else magnetic_strength
 
 @export_group("Weapon")
 @export var has_weapon: bool = true
@@ -67,10 +67,10 @@ extends BaseEntity
 @export var targeting_range: float = 300.0:
 	set(value):
 		targeting_range = value
-		if targeting_component:
-			targeting_component.detection_range = value
+		if targeting_range_stat:
+			targeting_range_stat.set_base_value(value)
 	get:
-		return targeting_component.detection_range if targeting_component else targeting_range
+		return targeting_range_stat.get_value() if targeting_range_stat else targeting_range
 
 #endregion
 
@@ -81,13 +81,20 @@ var collection_component: CollectionComponent
 var targeting_component: TargetingComponent
 var weapon_component: WeaponComponent
 
-## Health stat for UI binding and buff system
+## Stats for dynamic gameplay values that can be buffed/debuffed
 var health_stat: Stat
+var collection_range_stat: Stat
+var magnetic_strength_stat: Stat
+var targeting_range_stat: Stat
 
 ## Detection areas (created in scene or code)
 var collection_detection_area: Area2D = null
 var collection_area: Area2D = null
 var targeting_area: Area2D = null
+
+## Collision shapes for dynamic resizing
+var collection_shape: CollisionShape2D = null
+var targeting_shape: CollisionShape2D = null
 
 ## UI References (optional - can be bound externally)
 var health_bar: Range = null
@@ -99,24 +106,37 @@ var energy_bar: Range = null
 
 func _init() -> void:
 	super._init()
+	_create_player_stats()
 	_create_player_components()
 
 
-func _create_player_components() -> void:
-	# Create health stat for buffs/UI (player needs this, enemies don't)
+func _create_player_stats() -> void:
+	# Health stat for buffs/UI (player needs this, enemies don't)
 	health_stat = Stat.new(max_health, true, 0.0, max_health)
 	
+	# Collection range stat - can be buffed/debuffed during gameplay
+	collection_range_stat = Stat.new(collection_range, true, 0.0, 1000.0)
+	
+	# Magnetic strength stat - can be buffed/debuffed
+	magnetic_strength_stat = Stat.new(magnetic_strength, true, 0.0, 2000.0)
+	
+	# Targeting range stat - can be buffed/debuffed
+	targeting_range_stat = Stat.new(targeting_range, true, 0.0, 1000.0)
+
+
+func _create_player_components() -> void:
 	# Bind health component to stat
 	if health_component:
 		health_component.bind_health_stat(health_stat)
 	
-	# Player controller
-	controller = PlayerController.new(movement_component)
-	controller.setup_look(LookComponent.LookMode.VELOCITY, 8.0)
-	controller.setup_physics(1.0, false, 300.0)
-	controller.move_force = 1000.0
-	controller.set_control_mode(control_mode)
-	controller.set_input_mode(input_mode)
+	# Player controller - use temp variable to avoid getter loopback
+	var _controller = PlayerController.new(movement_component)
+	_controller.set_look_component(look_component)
+	_controller.setup_physics(1.0, false, 300.0)
+	_controller.move_force = 1000.0
+	_controller.set_control_mode(control_mode)
+	_controller.set_input_mode(input_mode)
+	controller = _controller
 
 
 func _ready() -> void:
@@ -143,27 +163,49 @@ func _setup_collection() -> void:
 		collection_detection_area.name = "CollectionDetectionArea"
 		add_child(collection_detection_area)
 		
-		var shape = CollisionShape2D.new()
+		collection_shape = CollisionShape2D.new()
 		var circle = CircleShape2D.new()
-		circle.radius = collection_range
-		shape.shape = circle
-		collection_detection_area.add_child(shape)
+		circle.radius = collection_range_stat.get_value()
+		collection_shape.shape = circle
+		collection_detection_area.add_child(collection_shape)
+	else:
+		# Find existing shape
+		collection_shape = collection_detection_area.get_node_or_null("CollisionShape2D")
+		if not collection_shape:
+			for child in collection_detection_area.get_children():
+				if child is CollisionShape2D:
+					collection_shape = child
+					break
 	
 	if not is_instance_valid(collection_area):
 		collection_area = self
 	
-	# Create collection component with two areas
-	# self = collection trigger (small ship collision)
-	# collection_detection_area = detection range (large)
-	collection_component = CollectionComponent.new(self, collection_detection_area, collection_area)
-	collection_component.set_collection_mode(CollectionComponent.CollectionMode.AUTOMATIC)
-	collection_component.magnetic_enabled = magnetic_collection
-	collection_component.magnetic_strength = magnetic_strength
-	collection_component.detection_range = collection_range
+	# Create collection component with temp variable to avoid getter loopback
+	var _collection_component = CollectionComponent.new(self, collection_detection_area, collection_area)
+	_collection_component.set_collection_mode(CollectionComponent.CollectionMode.AUTOMATIC)
+	_collection_component.magnetic_enabled = magnetic_collection
+	_collection_component.magnetic_strength = magnetic_strength_stat.get_value()
+	_collection_component.detection_range = collection_range_stat.get_value()
+	collection_component = _collection_component
+	
+	# Bind stats to component properties and collision shape
+	_bind_collection_stats()
 	
 	# Connect collection signals
 	collection_component.item_collected.connect(_on_item_collected)
 	collection_component.item_detected.connect(_on_item_detected)
+
+
+func _bind_collection_stats() -> void:
+	# Bind collection range stat to component's detection_range
+	collection_range_stat.bind_to_property(collection_component, "detection_range")
+	
+	# Bind collection range stat to the Area2D collision shape radius
+	if collection_shape and collection_shape.shape is CircleShape2D:
+		collection_range_stat.bind_to_property(collection_shape.shape, "radius")
+	
+	# Bind magnetic strength stat to component
+	magnetic_strength_stat.bind_to_property(collection_component, "magnetic_strength")
 
 
 func _setup_weapon() -> void:
@@ -176,21 +218,43 @@ func _setup_weapon() -> void:
 		targeting_area.name = "TargetingArea"
 		add_child(targeting_area)
 		
-		var shape = CollisionShape2D.new()
+		targeting_shape = CollisionShape2D.new()
 		var circle = CircleShape2D.new()
-		circle.radius = targeting_range
-		shape.shape = circle
-		targeting_area.add_child(shape)
+		circle.radius = targeting_range_stat.get_value()
+		targeting_shape.shape = circle
+		targeting_area.add_child(targeting_shape)
+	else:
+		# Find existing shape
+		targeting_shape = targeting_area.get_node_or_null("CollisionShape2D")
+		if not targeting_shape:
+			for child in targeting_area.get_children():
+				if child is CollisionShape2D:
+					targeting_shape = child
+					break
 	
-	# Create targeting component
-	targeting_component = TargetingComponent.new(self, targeting_area)
-	targeting_component.detection_range = targeting_range
+	# Create targeting component with temp variable to avoid getter loopback
+	var _targeting_component = TargetingComponent.new(self, targeting_area)
+	_targeting_component.detection_range = targeting_range_stat.get_value()
+	targeting_component = _targeting_component
+	
+	# Bind targeting range stat to component and collision shape
+	_bind_targeting_stats()
 	
 	# Create weapon based on projectile scene
 	if projectile_scene and damage_component:
-		weapon_component = ProjectileWeapon.new(self, projectile_scene, damage_component, targeting_component)
-		if weapon_component is ProjectileWeapon:
-			(weapon_component as ProjectileWeapon).auto_fire = weapon_auto_fire
+		var _weapon_component = ProjectileWeapon.new(self, projectile_scene, damage_component, targeting_component)
+		if _weapon_component is ProjectileWeapon:
+			(_weapon_component as ProjectileWeapon).auto_fire = weapon_auto_fire
+		weapon_component = _weapon_component
+
+
+func _bind_targeting_stats() -> void:
+	# Bind targeting range stat to component's detection_range
+	targeting_range_stat.bind_to_property(targeting_component, "detection_range")
+	
+	# Bind targeting range stat to the Area2D collision shape radius
+	if targeting_shape and targeting_shape.shape is CircleShape2D:
+		targeting_range_stat.bind_to_property(targeting_shape.shape, "radius")
 
 
 func _setup_ui_bindings() -> void:
@@ -200,8 +264,8 @@ func _setup_ui_bindings() -> void:
 	
 	# Bind health stat to health bar
 	if health_bar and health_stat:
+		health_stat.bind_max_to_property(health_bar, "max_value")
 		health_stat.bind_to_property(health_bar, "value")
-		health_bar.max_value = max_health
 
 #endregion
 
@@ -327,8 +391,20 @@ func get_enemy_count() -> int:
 
 #region Public API - Stat System
 
-## Get health stat for external binding
-func get_health_stat() -> Stat:
-	return health_stat
+## Get stat by name for buff/debuff system
+## Valid stat names: "health", "range", "magnet", "target_range"
+func get_stat(stat_name: String) -> Stat:
+	match stat_name:
+		"health":
+			return health_stat
+		"range":
+			return collection_range_stat
+		"magnet":
+			return magnetic_strength_stat
+		"target_range":
+			return targeting_range_stat
+		_:
+			push_error("BasePlayer: Unknown stat name '%s'" % stat_name)
+			return null
 
 #endregion

@@ -9,7 +9,9 @@ radius = 18.027756
 [node name="BaseEnemy" type="Area2D"]
 collision_layer = 2
 script = ExtResource("1_gc86p")
-move_speed = 50.0
+max_health = 20.0
+current_health = 20.0
+move_speed = 20.0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("CircleShape2D_bfeoi")

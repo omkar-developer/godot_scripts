@@ -81,6 +81,10 @@ func setup_look(mode: LookComponent.LookMode = LookComponent.LookMode.VELOCITY, 
 	look_component.rotation_speed = rotation_speed
 	return look_component
 
+func set_look_component(component: LookComponent):
+	if component == null: return
+	look_component = component
+
 func enable_obstacle_avoidance(avoidance_steering, weight: float = 1.0):
 	"""
 	Enable obstacle avoidance for STEERING mode with CLICK_TO_MOVE
@@ -229,7 +233,6 @@ func _update_twin_stick_aim():
 func _update_direct(input: Vector2):
 	"""Direct velocity control - instant response"""
 	movement.direction = input * movement.speed
-	movement.update(get_process_delta_time())
 
 func _update_physics(input: Vector2, delta: float):
 	"""Physics-based movement with momentum"""

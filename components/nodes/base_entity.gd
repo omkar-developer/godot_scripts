@@ -14,7 +14,7 @@ extends Area2D
 	set(value):
 		max_health = value
 		if health_component:
-			health_component.max_health = value
+			health_component.set_max_health(value)
 			health_component.current_health = minf(health_component.current_health, value)
 	get:
 		return health_component.max_health if health_component else max_health
@@ -35,8 +35,13 @@ extends Area2D
 	get:
 		return movement_component.speed if movement_component else move_speed
 
-@export var can_take_damage: bool = true
-@export var can_deal_damage: bool = true
+@export var invulnerable: bool = false:
+	set(value):
+		invulnerable = value
+		if health_component:
+			health_component.invulnerable = value
+	get:
+		return health_component.invulnerable if health_component else invulnerable
 
 @export_group("Damage Settings")
 @export var base_damage: float = 10.0:
@@ -105,7 +110,7 @@ extends Area2D
 	get:
 		return look_component.look_mode if look_component else look_mode
 
-@export var look_speed: float = 10.0:
+@export var look_speed: float = 6.0:
 	set(value):
 		look_speed = value
 		if look_component:
@@ -145,11 +150,12 @@ func _init() -> void:
 
 func _create_core_components() -> void:
 	# Movement component
-	movement_component = MovementComponent.new(self, move_speed)
-	movement_component.enabled = movement_enabled
+	var _movement_component = MovementComponent.new(self, move_speed)
+	_movement_component.enabled = movement_enabled
+	movement_component = _movement_component
 	
 	# Health component
-	health_component = HealthComponent.new(
+	var _health_component = HealthComponent.new(
 		self,
 		max_health,
 		iframe_duration,
@@ -158,20 +164,22 @@ func _create_core_components() -> void:
 		0.0,    # max_damage_per_hit
 		false   # prevent_death_once
 	)
-	health_component.damage_reduction = damage_reduction
-	health_component.damage_multiplier = damage_multiplier
-	health_component.iframe_enabled = iframe_enabled
+	_health_component.damage_reduction = damage_reduction
+	_health_component.damage_multiplier = damage_multiplier
+	_health_component.iframe_enabled = iframe_enabled
+	health_component = _health_component
 	
 	# Look component
-	look_component = LookComponent.new(movement_component)
-	look_component.look_mode = look_mode
-	look_component.rotation_speed = look_speed
-	look_component.active = look_enabled
+	var _look_component = LookComponent.new(movement_component)
+	_look_component.look_mode = look_mode
+	_look_component.active = look_enabled
+	_look_component.rotation_speed = look_speed
+	look_component = _look_component
 	
 	# Damage component (for dealing damage to others)
-	if can_deal_damage:
-		damage_component = DamageComponent.new(self)
-		damage_component.damage = base_damage
+	var _damage_component = DamageComponent.new(self)
+	_damage_component.damage = base_damage
+	damage_component = _damage_component
 	
 	_initialized = true
 
@@ -301,7 +309,7 @@ func _on_heal_received(_amount: float) -> void:
 
 ## Deal damage to another entity
 func attack(target_health: HealthComponent) -> DamageResult:
-	if not can_deal_damage or not damage_component:
+	if not damage_component:
 		return null
 	
 	return damage_component.apply_to(target_health)
@@ -309,7 +317,7 @@ func attack(target_health: HealthComponent) -> DamageResult:
 
 ## Take damage from a source
 func take_damage(damage_request: DamageRequest) -> DamageResult:
-	if not can_take_damage or not health_component:
+	if not health_component:
 		return null
 	
 	return health_component.process_damage(damage_request)

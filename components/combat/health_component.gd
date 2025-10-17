@@ -20,6 +20,7 @@ var shield_enabled: bool = false
 var max_damage_per_hit: float = 0.0
 var prevent_death_once: bool = false
 var _death_prevented: bool = false
+var invulnerable: bool = false
 var immune_damage_types: Array[int] = []
 
 # Stat binding control
@@ -74,6 +75,12 @@ func _init(
 
 func process_damage(request: DamageRequest) -> DamageResult:
 	var result = DamageResult.new(request)
+	
+	if invulnerable:
+		result.was_blocked = true
+		damage_blocked.emit(request)
+		damage_taken.emit(result)
+		return result
 	
 	if immune_damage_types.has(request.damage_type):
 		result.was_blocked = true
@@ -221,7 +228,7 @@ func update(delta: float) -> void:
 			iframe_ended.emit()
 
 func is_invulnerable() -> bool:
-	return is_dead or (iframe_enabled and iframe_timer > 0.0)
+	return invulnerable or is_dead or (iframe_enabled and iframe_timer > 0.0)
 
 func get_health() -> float:
 	return current_health

@@ -11,7 +11,13 @@ extends BaseEntity
 @export_group("Enemy Behavior")
 @export var chase_enabled: bool = true
 @export var update_direction_every_frame: bool = true
-@export var update_interval: float = 0.1  ## Only used if update_direction_every_frame is false
+@export var update_interval: float = 0.1:  ## Only used if update_direction_every_frame is false
+	set(value):
+		update_interval = value
+		if homing_component:
+			homing_component.update_interval = value
+	get:
+		return homing_component.update_interval if homing_component else update_interval
 
 @export_group("Collision Damage")
 @export var collision_damage_enabled: bool = true
@@ -48,10 +54,12 @@ func _init() -> void:
 func _create_enemy_components() -> void:
 	# Only create homing if chase is enabled
 	if chase_enabled:
-		homing_component = HomingComponent.new(movement_component, null)
-		homing_component.homing_enabled = true
-		homing_component.update_direction_every_frame = update_direction_every_frame
-		homing_component.update_interval = update_interval
+		# Use temp variable to avoid getter loopback
+		var _homing_component = HomingComponent.new(movement_component, null)
+		_homing_component.homing_enabled = true
+		_homing_component.update_direction_every_frame = update_direction_every_frame
+		_homing_component.update_interval = update_interval
+		homing_component = _homing_component
 
 
 func _ready() -> void:

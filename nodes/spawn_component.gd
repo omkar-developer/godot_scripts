@@ -1,3 +1,4 @@
+@tool
 class_name SpawnerComponent
 extends Node2D
 
@@ -41,19 +42,34 @@ enum SpawnMode {
 
 @export_group("Spawn Area")
 ## Shape of spawn area
-@export var area_shape: AreaShape = AreaShape.CIRCLE
+@export var area_shape: AreaShape = AreaShape.CIRCLE:
+	set(value):
+		area_shape = value
+		queue_redraw()
 
 ## Where to spawn within area
-@export var spawn_location: SpawnLocation = SpawnLocation.VOLUME
+@export var spawn_location: SpawnLocation = SpawnLocation.VOLUME:
+	set(value):
+		spawn_location = value
+		queue_redraw()
 
 ## Center position of spawn area (local to this node)
-@export var spawn_center: Vector2 = Vector2.ZERO
+@export var spawn_center: Vector2 = Vector2.ZERO:
+	set(value):
+		spawn_center = value
+		queue_redraw()
 
 ## Circle: radius of spawn area
-@export var spawn_radius: float = 100.0
+@export var spawn_radius: float = 100.0:
+	set(value):
+		spawn_radius = value
+		queue_redraw()
 
 ## Rectangle: size of spawn area
-@export var spawn_size: Vector2 = Vector2(200.0, 200.0)
+@export var spawn_size: Vector2 = Vector2(200.0, 200.0):
+	set(value):
+		spawn_size = value
+		queue_redraw()
 
 ## --- SPAWN MODE SETTINGS ---
 
@@ -95,6 +111,57 @@ enum SpawnMode {
 ## Where to add spawned entities (null = this node's parent)
 @export var spawn_parent: Node = null
 
+## --- CUSTOM PROPERTIES ---
+
+@export_group("Custom Properties")
+## Properties to set on spawned entities { "property_name": value }
+## Supports nested properties using dot notation: "health_component.max_health"
+@export var spawn_properties: Dictionary = {}
+
+## Per-scene properties (indexed by spawn_scenes array index)
+## These override spawn_properties for specific scenes
+@export var spawn_scene_properties: Array[Dictionary] = []
+
+## --- ENTITY TRACKING ---
+
+@export_group("Entity Tracking")
+## Signal name to listen for on spawned entities (for death/destruction)
+## When this signal is emitted, alive_count will decrement
+@export var death_signal_name: String = "tree_exiting"
+
+## --- VISUAL HELPERS ---
+
+@export_group("Visual Helpers")
+## Show spawn area visualization in editor
+@export var show_spawn_area: bool = true:
+	set(value):
+		show_spawn_area = value
+		queue_redraw()
+
+## Color of spawn area visualization
+@export var spawn_area_color: Color = Color(0.0, 1.0, 0.0, 0.5):
+	set(value):
+		spawn_area_color = value
+		queue_redraw()
+
+## Show spawn center crosshair
+@export var show_center: bool = true:
+	set(value):
+		show_center = value
+		queue_redraw()
+
+## Show preview spawn points
+@export var show_spawn_preview: bool = false:
+	set(value):
+		show_spawn_preview = value
+		queue_redraw()
+
+## Number of preview spawn points to show
+@export var preview_count: int = 10:
+	set(value):
+		preview_count = max(1, value)
+		queue_redraw()
+
 ## --- AUTO START ---
 
 @export_group("Auto Start")
@@ -112,11 +179,11 @@ var is_spawning: bool = false
 ## Whether spawner is paused
 var is_paused: bool = false
 
-## Current spawn count
-var spawn_count: int = 0
+## Total entities spawned in lifetime (never decrements)
+var total_spawned: int = 0
 
-## Currently alive entities (weak references)
-var alive_entities: Array = []
+## Current number of alive entities
+var alive_count: int = 0
 
 ## Internal timer for interval/wave modes
 var _spawn_timer: float = 0.0
@@ -167,6 +234,10 @@ signal list_completed()
 
 
 func _ready() -> void:
+	# Only run spawning logic at runtime
+	if Engine.is_editor_hint():
+		return
+	
 	# Prepare spawn list if in LIST mode
 	if spawn_mode == SpawnMode.LIST:
 		_prepare_spawn_list()
@@ -181,6 +252,10 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	# Editor: just redraw if needed
+	if Engine.is_editor_hint():
+		return
+	
 	# Handle auto-start delay
 	if _waiting_for_auto_start:
 		_auto_start_timer += delta
@@ -191,9 +266,6 @@ func _process(delta: float) -> void:
 	
 	if not is_spawning or is_paused:
 		return
-	
-	# Clean up dead entities
-	_cleanup_dead_entities()
 	
 	# Check spawn limits
 	if _is_spawn_limit_reached():
@@ -208,6 +280,44 @@ func _process(delta: float) -> void:
 			_update_wave_mode(delta)
 		SpawnMode.LIST:
 			_update_list_mode(delta)
+
+
+func _draw() -> void:
+	# Only draw in editor
+	if not Engine.is_editor_hint():
+		return
+	
+	if not show_spawn_area:
+		return
+	
+	# Draw spawn center crosshair
+	if show_center:
+		var cross_size := 10.0
+		draw_line(
+			spawn_center + Vector2(-cross_size, 0),
+			spawn_center + Vector2(cross_size, 0),
+			spawn_area_color,
+			2.0
+		)
+		draw_line(
+			spawn_center + Vector2(0, -cross_size),
+			spawn_center + Vector2(0, cross_size),
+			spawn_area_color,
+			2.0
+		)
+	
+	# Draw spawn area based on shape
+	match area_shape:
+		AreaShape.POINT:
+			_draw_point_area()
+		AreaShape.CIRCLE:
+			_draw_circle_area()
+		AreaShape.RECTANGLE:
+			_draw_rectangle_area()
+	
+	# Draw spawn preview points
+	if show_spawn_preview:
+		_draw_spawn_preview()
 
 
 ## Start spawning entities.
@@ -294,9 +404,15 @@ func spawn_entity(scene_index: int = -1, spawn_position: Variant = null) -> Node
 	# Add to scene
 	parent.add_child(entity)
 	
-	# Track entity
-	alive_entities.append(entity)
-	spawn_count += 1
+	# Apply custom properties
+	_apply_entity_properties(entity, scene_index)
+	
+	# Connect death signal for tracking
+	_connect_death_signal(entity)
+	
+	# Update counters
+	alive_count += 1
+	total_spawned += 1
 	
 	# Emit signal
 	entity_spawned.emit(entity, scene_index)
@@ -304,10 +420,10 @@ func spawn_entity(scene_index: int = -1, spawn_position: Variant = null) -> Node
 	return entity
 
 
-## Reset spawn counter and alive entities tracking.
+## Reset spawn counters.
 func reset() -> void:
-	spawn_count = 0
-	alive_entities.clear()
+	total_spawned = 0
+	alive_count = 0
 	_spawn_timer = 0.0
 	_list_index = 0
 	_current_delay = 0.0
@@ -316,8 +432,13 @@ func reset() -> void:
 ## Get number of currently alive entities.[br]
 ## [return]: Count of alive entities.
 func get_alive_count() -> int:
-	_cleanup_dead_entities()
-	return alive_entities.size()
+	return alive_count
+
+
+## Get total spawned entities in lifetime.[br]
+## [return]: Total spawn count.
+func get_total_spawned() -> int:
+	return total_spawned
 
 
 ## Check if max alive limit is reached.[br]
@@ -325,7 +446,7 @@ func get_alive_count() -> int:
 func is_alive_limit_reached() -> bool:
 	if max_alive < 0:
 		return false
-	return get_alive_count() >= max_alive
+	return alive_count >= max_alive
 
 
 ## Set spawn scene (single scene mode).[br]
@@ -373,6 +494,41 @@ func set_spawn_list(list: Dictionary) -> void:
 	_prepare_spawn_list()
 
 
+## Set custom properties to apply to spawned entities.[br]
+## [param properties]: Dictionary of property names and values.[br]
+## Supports nested properties with dot notation (e.g., "component.property")
+func set_spawn_properties(properties: Dictionary) -> void:
+	spawn_properties = properties
+
+
+## Add/update a single spawn property.[br]
+## [param property_path]: Property name or path (supports dot notation).[br]
+## [param value]: Value to set.
+func set_spawn_property(property_path: String, value: Variant) -> void:
+	spawn_properties[property_path] = value
+
+
+## Remove a spawn property.[br]
+## [param property_path]: Property name or path to remove.
+func remove_spawn_property(property_path: String) -> void:
+	spawn_properties.erase(property_path)
+
+
+## Clear all spawn properties.
+func clear_spawn_properties() -> void:
+	spawn_properties.clear()
+
+
+## Set properties for a specific scene index.[br]
+## [param scene_index]: Index in spawn_scenes array.[br]
+## [param properties]: Dictionary of properties for this scene.
+func set_scene_properties(scene_index: int, properties: Dictionary) -> void:
+	# Expand array if needed
+	while spawn_scene_properties.size() <= scene_index:
+		spawn_scene_properties.append({})
+	spawn_scene_properties[scene_index] = properties
+
+
 ## --- INTERNAL METHODS ---
 
 ## Update INTERVAL spawn mode.
@@ -413,7 +569,7 @@ func _update_wave_mode(delta: float) -> void:
 			spawned += 1
 		
 		if spawned > 0:
-			var wave_num := floori(spawn_count / float(wave_size))
+			var wave_num := floori(total_spawned / float(wave_size))
 			wave_completed.emit(wave_num)
 
 
@@ -559,16 +715,75 @@ func _get_rectangle_spawn_position() -> Vector2:
 	return spawn_center
 
 
-## Clean up dead entities from tracking array.
-func _cleanup_dead_entities() -> void:
-	alive_entities = alive_entities.filter(func(e): return is_instance_valid(e))
+## Apply properties to spawned entity.[br]
+## This function handles property assignment and can be extended for features like min/max ranges.
+func _apply_entity_properties(entity: Node, scene_index: int) -> void:
+	# Apply global properties first
+	for property_path in spawn_properties.keys():
+		var value = spawn_properties[property_path]
+		_set_property_on_entity(entity, property_path, value)
+	
+	# Apply scene-specific properties (override global)
+	if scene_index >= 0 and scene_index < spawn_scene_properties.size():
+		var scene_props := spawn_scene_properties[scene_index]
+		for property_path in scene_props.keys():
+			var value = scene_props[property_path]
+			_set_property_on_entity(entity, property_path, value)
+
+
+## Set property on entity with support for nested paths.[br]
+## This is the core property assignment function that can be extended later.
+func _set_property_on_entity(entity: Node, property_path: String, value: Variant) -> void:
+	# TODO: Future enhancement - check if value is a range/curve and randomize
+	# For now, just set the value directly
+	_set_nested_property(entity, property_path, value)
+
+
+## Set nested property using dot notation.[br]
+## Example: "health_component.max_health" will set entity.health_component.max_health
+func _set_nested_property(entity: Node, property_path: String, value: Variant) -> void:
+	var parts := property_path.split(".")
+	var current: Variant = entity
+	
+	# Navigate to the nested object
+	for i in range(parts.size() - 1):
+		var part := parts[i]
+		if current.get(part) == null:
+			push_warning("SpawnerComponent: Property path '%s' not found (stopped at '%s')" % [property_path, part])
+			return
+		current = current.get(part)
+	
+	# Set the final property
+	var final_property := parts[-1]
+	if current.get(final_property) == null and not (current is Node and current.has_method("set")):
+		push_warning("SpawnerComponent: Property '%s' not found on '%s'" % [final_property, current])
+		return
+	
+	current.set(final_property, value)
+
+
+## Connect to entity's death signal for tracking.
+func _connect_death_signal(entity: Node) -> void:
+	if death_signal_name.is_empty():
+		return
+	
+	if not entity.has_signal(death_signal_name):
+		push_warning("SpawnerComponent: Entity does not have signal '%s'" % death_signal_name)
+		return
+	
+	entity.connect(death_signal_name, _on_entity_died)
+
+
+## Callback when entity dies/is destroyed.
+func _on_entity_died() -> void:
+	alive_count = max(0, alive_count - 1)
 
 
 ## Check if spawn limit reached.[br]
 ## [return]: true if any limit is reached.
 func _is_spawn_limit_reached() -> bool:
 	# Check max spawns
-	if max_spawns >= 0 and spawn_count >= max_spawns:
+	if max_spawns >= 0 and total_spawned >= max_spawns:
 		spawn_limit_reached.emit()
 		return true
 	
@@ -579,14 +794,93 @@ func _is_spawn_limit_reached() -> bool:
 	return false
 
 
+## Draw point spawn area.
+func _draw_point_area() -> void:
+	var point_size := 8.0
+	draw_circle(spawn_center, point_size, spawn_area_color)
+
+
+## Draw circle spawn area.
+func _draw_circle_area() -> void:
+	var points := 64
+	var step := TAU / points
+	
+	match spawn_location:
+		SpawnLocation.VOLUME:
+			# Draw filled circle
+			draw_circle(spawn_center, spawn_radius, Color(spawn_area_color, spawn_area_color.a * 0.3))
+			# Draw outline
+			for i in range(points):
+				var angle1 := i * step
+				var angle2 := (i + 1) * step
+				var p1 := spawn_center + Vector2(cos(angle1), sin(angle1)) * spawn_radius
+				var p2 := spawn_center + Vector2(cos(angle2), sin(angle2)) * spawn_radius
+				draw_line(p1, p2, spawn_area_color, 2.0)
+		
+		SpawnLocation.EDGE:
+			# Draw thick edge
+			for i in range(points):
+				var angle1 := i * step
+				var angle2 := (i + 1) * step
+				var p1 := spawn_center + Vector2(cos(angle1), sin(angle1)) * spawn_radius
+				var p2 := spawn_center + Vector2(cos(angle2), sin(angle2)) * spawn_radius
+				draw_line(p1, p2, spawn_area_color, 4.0)
+
+
+## Draw rectangle spawn area.
+func _draw_rectangle_area() -> void:
+	var half_size := spawn_size / 2.0
+	var rect := Rect2(spawn_center - half_size, spawn_size)
+	
+	match spawn_location:
+		SpawnLocation.VOLUME:
+			# Draw filled rectangle
+			draw_rect(rect, Color(spawn_area_color, spawn_area_color.a * 0.3))
+			# Draw outline
+			draw_rect(rect, spawn_area_color, false, 2.0)
+		
+		SpawnLocation.EDGE:
+			# Draw thick edges
+			var tl := rect.position
+			var tr := rect.position + Vector2(rect.size.x, 0)
+			var br := rect.position + rect.size
+			var bl := rect.position + Vector2(0, rect.size.y)
+			draw_line(tl, tr, spawn_area_color, 4.0)
+			draw_line(tr, br, spawn_area_color, 4.0)
+			draw_line(br, bl, spawn_area_color, 4.0)
+			draw_line(bl, tl, spawn_area_color, 4.0)
+		
+		SpawnLocation.CORNERS:
+			# Draw corner markers
+			var corner_size := 10.0
+			var corners := [
+				rect.position,
+				rect.position + Vector2(rect.size.x, 0),
+				rect.position + rect.size,
+				rect.position + Vector2(0, rect.size.y)
+			]
+			for corner in corners:
+				draw_circle(corner, corner_size, spawn_area_color)
+
+
+## Draw preview spawn points.
+func _draw_spawn_preview() -> void:
+	var point_color := Color(spawn_area_color.r, spawn_area_color.g, spawn_area_color.b, 0.8)
+	var point_size := 4.0
+	
+	for i in range(preview_count):
+		var pos := _get_spawn_position() - global_position
+		draw_circle(pos, point_size, point_color)
+
+
 ## Get spawner statistics.[br]
 ## [return]: Dictionary with stats.
 func get_stats() -> Dictionary:
 	return {
 		"is_spawning": is_spawning,
 		"is_paused": is_paused,
-		"spawn_count": spawn_count,
-		"alive_count": get_alive_count(),
+		"total_spawned": total_spawned,
+		"alive_count": alive_count,
 		"spawn_mode": SpawnMode.keys()[spawn_mode],
 		"area_shape": AreaShape.keys()[area_shape],
 		"spawn_location": SpawnLocation.keys()[spawn_location]
