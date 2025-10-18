@@ -94,7 +94,7 @@ enum SpawnMode {
 @export_subgroup("List Mode")
 ## LIST mode: spawn list format: { delay: [scene_indices], ... }
 ## Example: { 0.0: [0], 2.5: [1, 1], 5.0: [0, 1, 2] }
-@export var spawn_list: Dictionary = {}
+@export var spawn_list: Dictionary[float, Array] = {}
 
 ## --- SPAWN LIMITS ---
 
@@ -116,11 +116,30 @@ enum SpawnMode {
 @export_group("Custom Properties")
 ## Properties to set on spawned entities { "property_name": value }
 ## Supports nested properties using dot notation: "health_component.max_health"
-@export var spawn_properties: Dictionary = {}
+@export var spawn_properties: Dictionary[String, Variant] = {}
 
 ## Per-scene properties (indexed by spawn_scenes array index)
 ## These override spawn_properties for specific scenes
 @export var spawn_scene_properties: Array[Dictionary] = []
+
+@export_group("Advanced Properties")
+## Advanced property value declarations: { "property_path": SpawnPropertyValue }
+## Property path supports dot notation (e.g., "health_component.max_health")
+@export var advanced_properties: Dictionary[String, SpawnPropertyValue] = {}
+
+## Per-scene advanced property assignments (JSON format for easier editing)
+## Format: [["prop1", "prop2"], ["prop3"], ["prop1", "prop3"]]
+## Each array = scene index, values = property names from advanced_properties
+@export_multiline var spawn_scene_properties_json: String = "":
+	set(value):
+		spawn_scene_properties_json = value
+		_parse_scene_properties_json()
+
+## Parsed array (don't edit directly, use spawn_scene_properties_json)
+var spawn_scene_properties_advanced: Array[Array] = []
+
+## Apply advanced properties to all scenes (ignores spawn_scene_properties_advanced)
+@export var use_declarations_as_global: bool = false
 
 ## --- ENTITY TRACKING ---
 
@@ -234,10 +253,12 @@ signal list_completed()
 
 
 func _ready() -> void:
-	# Only run spawning logic at runtime
+	# Parse scene properties JSON if in editor
 	if Engine.is_editor_hint():
+		_parse_scene_properties_json()
 		return
 	
+	# Only run spawning logic at runtime
 	# Prepare spawn list if in LIST mode
 	if spawn_mode == SpawnMode.LIST:
 		_prepare_spawn_list()
@@ -718,12 +739,15 @@ func _get_rectangle_spawn_position() -> Vector2:
 ## Apply properties to spawned entity.[br]
 ## This function handles property assignment and can be extended for features like min/max ranges.
 func _apply_entity_properties(entity: Node, scene_index: int) -> void:
-	# Apply global properties first
+	# 1. Apply advanced properties first (highest priority)
+	_apply_advanced_properties(entity, scene_index)
+	
+	# 2. Apply global properties
 	for property_path in spawn_properties.keys():
 		var value = spawn_properties[property_path]
 		_set_property_on_entity(entity, property_path, value)
 	
-	# Apply scene-specific properties (override global)
+	# 3. Apply scene-specific properties (override global)
 	if scene_index >= 0 and scene_index < spawn_scene_properties.size():
 		var scene_props := spawn_scene_properties[scene_index]
 		for property_path in scene_props.keys():
@@ -734,9 +758,74 @@ func _apply_entity_properties(entity: Node, scene_index: int) -> void:
 ## Set property on entity with support for nested paths.[br]
 ## This is the core property assignment function that can be extended later.
 func _set_property_on_entity(entity: Node, property_path: String, value: Variant) -> void:
-	# TODO: Future enhancement - check if value is a range/curve and randomize
-	# For now, just set the value directly
 	_set_nested_property(entity, property_path, value)
+
+
+## Apply advanced properties to entity.
+func _apply_advanced_properties(entity: Node, scene_index: int) -> void:
+	if advanced_properties.is_empty():
+		return
+	
+	var properties_to_apply: Array = []
+	
+	# Determine which properties to apply
+	if use_declarations_as_global:
+		# Use all advanced properties
+		properties_to_apply = advanced_properties.keys()
+	else:
+		# Use scene-specific properties
+		if scene_index >= 0 and scene_index < spawn_scene_properties_advanced.size():
+			var scene_props = spawn_scene_properties_advanced[scene_index]
+			if scene_props is Array:
+				properties_to_apply = scene_props
+	
+	# Apply selected properties
+	for prop_name in properties_to_apply:
+		if not advanced_properties.has(prop_name):
+			push_warning("SpawnPropertyValue '%s' not found in advanced_properties" % prop_name)
+			continue
+		
+		var prop_value: SpawnPropertyValue = advanced_properties[prop_name]
+		if not prop_value:
+			continue
+		
+		# Get context value based on property's context source
+		var x_value := _get_context_value(prop_value.context_source)
+		
+		# Get the generated value
+		var value = prop_value.get_value(x_value)
+		
+		# Set the property (prop_name is already the target path)
+		_set_nested_property(entity, prop_name, value)
+
+
+## Get context value for advanced properties based on source type.
+func _get_context_value(source: SpawnPropertyValue.ContextSource) -> float:
+	match source:
+		SpawnPropertyValue.ContextSource.SPAWN_INDEX:
+			return float(total_spawned)
+		
+		SpawnPropertyValue.ContextSource.SPAWN_PROGRESS:
+			if max_spawns > 0:
+				return clamp(float(total_spawned) / float(max_spawns), 0.0, 1.0)
+			return 0.0
+		
+		SpawnPropertyValue.ContextSource.ALIVE_COUNT:
+			return float(alive_count)
+		
+		SpawnPropertyValue.ContextSource.TIME_ELAPSED:
+			return _spawn_timer
+		
+		SpawnPropertyValue.ContextSource.WAVE_NUMBER:
+			if spawn_mode == SpawnMode.WAVE and wave_size > 0:
+				return float(floori(total_spawned / float(wave_size)))
+			return 0.0
+		
+		SpawnPropertyValue.ContextSource.RANDOM:
+			return randf()
+		
+		_:
+			return 0.0
 
 
 ## Set nested property using dot notation.[br]
@@ -885,3 +974,37 @@ func get_stats() -> Dictionary:
 		"area_shape": AreaShape.keys()[area_shape],
 		"spawn_location": SpawnLocation.keys()[spawn_location]
 	}
+
+
+## Parse JSON string into spawn_scene_properties_advanced array.
+func _parse_scene_properties_json() -> void:
+	if spawn_scene_properties_json.is_empty():
+		spawn_scene_properties_advanced.clear()
+		return
+	
+	var json = JSON.new()
+	var error = json.parse(spawn_scene_properties_json)
+	
+	if error != OK:
+		push_error("SpawnerComponent: Failed to parse spawn_scene_properties_json at line %d: %s" % [json.get_error_line(), json.get_error_message()])
+		return
+	
+	var data = json.data
+	if not data is Array:
+		push_error("SpawnerComponent: spawn_scene_properties_json must be an array")
+		return
+	
+	# Convert to Array[Array] and validate
+	spawn_scene_properties_advanced.clear()
+	for scene_data in data:
+		if scene_data is Array:
+			var scene_props: Array = []
+			for prop in scene_data:
+				if prop is String:
+					scene_props.append(prop)
+				else:
+					push_warning("SpawnerComponent: Property in scene data is not a string: %s" % str(prop))
+			spawn_scene_properties_advanced.append(scene_props)
+		else:
+			push_warning("SpawnerComponent: Scene data is not an array: %s" % str(scene_data))
+			spawn_scene_properties_advanced.append([])
