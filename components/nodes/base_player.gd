@@ -51,19 +51,7 @@ extends BaseEntity
 	get:
 		return magnetic_strength_stat.get_value() if magnetic_strength_stat else magnetic_strength
 
-@export_group("Weapon")
-@export var has_weapon: bool = true
-@export var weapon_auto_fire: bool = true:
-	set(value):
-		weapon_auto_fire = value
-		if weapon_component and weapon_component is ProjectileWeapon:
-			(weapon_component as ProjectileWeapon).auto_fire = value
-	get:
-		if weapon_component and weapon_component is ProjectileWeapon:
-			return (weapon_component as ProjectileWeapon).auto_fire
-		return weapon_auto_fire
-
-@export var projectile_scene: PackedScene = null
+@export_group("Targeting")
 @export var targeting_range: float = 300.0:
 	set(value):
 		targeting_range = value
@@ -79,7 +67,6 @@ extends BaseEntity
 var controller: PlayerController
 var collection_component: CollectionComponent
 var targeting_component: TargetingComponent
-var weapon_component: WeaponComponent
 
 ## Stats for dynamic gameplay values that can be buffed/debuffed
 var health_stat: Stat
@@ -120,7 +107,7 @@ func _create_player_stats() -> void:
 	# Magnetic strength stat - can be buffed/debuffed
 	magnetic_strength_stat = Stat.new(magnetic_strength, true, 0.0, 2000.0)
 	
-	# Targeting range stat - can be buffed/debuffed
+	# Targeting range stat - used by targeting component
 	targeting_range_stat = Stat.new(targeting_range, true, 0.0, 1000.0)
 
 
@@ -138,19 +125,18 @@ func _create_player_components() -> void:
 	_controller.set_input_mode(input_mode)
 	controller = _controller
 
-
-func _ready() -> void:
-	super._ready()
-	
+func _enter_tree() -> void:
 	# Setup player-specific systems
 	if collection_enabled:
 		_setup_collection()
 	
-	if has_weapon:
-		_setup_weapon()
+	# Setup targeting (used later by weapon node)
+	_setup_targeting()
 	
-	_setup_ui_bindings()
+	_setup_ui_bindings()	
 
+func _ready() -> void:
+	super._ready()
 
 func _setup_collection() -> void:
 	# Try to find collection area in children
@@ -208,8 +194,9 @@ func _bind_collection_stats() -> void:
 	magnetic_strength_stat.bind_to_property(collection_component, "magnetic_strength")
 
 
-func _setup_weapon() -> void:
-	# Try to find targeting area
+# New: targeting setup and bindings
+func _setup_targeting() -> void:
+	# Try to find targeting area in children
 	targeting_area = get_node_or_null("TargetingArea")
 	
 	if not targeting_area:
@@ -239,13 +226,6 @@ func _setup_weapon() -> void:
 	
 	# Bind targeting range stat to component and collision shape
 	_bind_targeting_stats()
-	
-	# Create weapon based on projectile scene
-	if projectile_scene and damage_component:
-		var _weapon_component = ProjectileWeapon.new(self, projectile_scene, damage_component, targeting_component)
-		if _weapon_component is ProjectileWeapon:
-			(_weapon_component as ProjectileWeapon).auto_fire = weapon_auto_fire
-		weapon_component = _weapon_component
 
 
 func _bind_targeting_stats() -> void:
@@ -278,9 +258,6 @@ func _process(delta: float) -> void:
 	
 	if collection_component:
 		collection_component.update(delta)
-	
-	if weapon_component:
-		weapon_component.update(delta)
 	
 	if targeting_component:
 		targeting_component.update(delta)
@@ -336,8 +313,7 @@ func _on_collect_item(_item: Node, _item_type: String, _value: int) -> void:
 
 ## Fire weapon manually
 func fire_weapon() -> void:
-	if weapon_component and weapon_component.has_method("try_fire"):
-		weapon_component.try_fire()
+	return
 
 
 ## Toggle magnetic collection
@@ -392,7 +368,7 @@ func get_enemy_count() -> int:
 #region Public API - Stat System
 
 ## Get stat by name for buff/debuff system
-## Valid stat names: "health", "range", "magnet", "target_range"
+## Valid stat names: "health", "range", "magnet"
 func get_stat(stat_name: String) -> Stat:
 	match stat_name:
 		"health":
@@ -401,8 +377,6 @@ func get_stat(stat_name: String) -> Stat:
 			return collection_range_stat
 		"magnet":
 			return magnetic_strength_stat
-		"target_range":
-			return targeting_range_stat
 		_:
 			push_error("BasePlayer: Unknown stat name '%s'" % stat_name)
 			return null

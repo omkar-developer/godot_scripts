@@ -45,11 +45,9 @@ signal damage_immunity_triggered(damage_type: int)
 signal health_value_set(value: float)
 signal health_value_added(delta: float)
 signal max_health_value_set(value: float)
-signal max_health_value_added(delta: float)
 signal shield_value_set(value: float)
 signal shield_value_added(delta: float)
 signal max_shield_value_set(value: float)
-signal max_shield_value_added(delta: float)
 
 func _init(
 	_owner: Object,
@@ -376,7 +374,7 @@ func bind_health_stat(stat) -> void:
 	
 	_health_stat_bound = true
 	stat.bind_to_property(self, "current_health", "health_value_set", "health_value_added")
-	stat.bind_max_to_property(self, "max_health", "max_health_value_set", "max_health_value_added")
+	stat.bind_max_to_property(self, "max_health", "max_health_value_set")
 
 func bind_shield_stat(stat) -> void:
 	if not stat.has_method("bind_to_property"):
