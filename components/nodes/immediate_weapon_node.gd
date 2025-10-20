@@ -1,4 +1,5 @@
 @tool
+@icon("res://scripts/icons/immediate.svg")
 class_name ImmediateWeaponNode
 extends WeaponNode
 

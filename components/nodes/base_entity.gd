@@ -1,3 +1,4 @@
+@icon("res://scripts/icons/entity.svg")
 class_name BaseEntity
 extends Area2D
 

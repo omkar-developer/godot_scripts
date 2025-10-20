@@ -1,3 +1,4 @@
+@icon("res://scripts/icons/weapon.svg")
 class_name WeaponManager
 extends Node2D
 

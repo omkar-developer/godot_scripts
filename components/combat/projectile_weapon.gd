@@ -1,3 +1,4 @@
+@icon("res://scripts/icons/projectile.svg")
 class_name ProjectileWeapon
 extends WeaponComponent
 

@@ -1,4 +1,5 @@
 @tool
+@icon("res://scripts/icons/weapon.svg")
 class_name WeaponNode
 extends Node2D
 
@@ -6,30 +7,7 @@ extends Node2D
 @export var weapon_id: String = ""
 @export var auto_fire: bool = true
 @export var enabled: bool = true
-@export var spawn_point: Node2D = null
-@export var spawn_offset: Vector2 = Vector2.ZERO
 
-## Targeting
-@export var use_global_targeting: bool = true
-@export var needs_targeting: bool = true  # Some weapons don't need targeting (e.g., random fire)
-
-## Stats (all editable in inspector)
-@export var damage: Stat = Stat.new(10.0, true, 0.0, 10000.0)
-@export var fire_rate: Stat = Stat.new(1.0, true, 0.01, 100.0)
-@export var projectile_speed: Stat = Stat.new(300.0, true, 0.0, 10000.0)
-@export var weapon_range: Stat = Stat.new(300.0, true, 0.0, 10000.0)
-@export var crit_chance: Stat = Stat.new(0.0, true, 0.0, 1.0)
-@export var crit_damage: Stat = Stat.new(1.5, true, 1.0, 10.0)
-
-## Scaling (how much % of parent stat to add)
-@export var damage_scaling: Stat = Stat.new(1.0, true, 0.0, 2.0)
-@export var fire_rate_scaling: Stat = Stat.new(1.0, true, 0.0, 2.0)
-@export var projectile_speed_scaling: Stat = Stat.new(1.0, true, 0.0, 2.0)
-@export var range_scaling: Stat = Stat.new(1.0, true, 0.0, 2.0)
-@export var crit_chance_scaling: Stat = Stat.new(1.0, true, 0.0, 2.0)
-@export var crit_damage_scaling: Stat = Stat.new(1.0, true, 0.0, 2.0)
-
-## Damage type
 @export var damage_type: int = 0:
 	set(value):
 		damage_type = value
@@ -37,6 +15,38 @@ extends Node2D
 			damage_component.damage_type = value
 	get:
 		return damage_component.damage_type if damage_component else damage_type
+
+@export var spawn_point: Node2D = null
+@export var spawn_offset: Vector2 = Vector2.ZERO
+
+@export_group("Continuous Fire")
+@export var fire_mode: WeaponComponent.FireMode = WeaponComponent.FireMode.SINGLE
+@export var stop_condition: WeaponComponent.StopCondition = WeaponComponent.StopCondition.SHOT_COUNT
+@export var fire_interval: float = 0.1
+@export var max_shots: int = 3
+@export var max_duration: float = 1.0
+@export var fire_on_start: bool = true
+@export var cooldown_after_stop: bool = true
+
+@export_group("Targeting")
+@export var use_global_targeting: bool = true
+@export var needs_targeting: bool = true  # Some weapons don't need targeting (e.g., random fire)
+
+@export_group("Stats")
+@export var damage: Stat = Stat.new(10.0, true, 0.0, 10000.0)
+@export var fire_rate: Stat = Stat.new(1.0, true, 0.01, 100.0)
+@export var projectile_speed: Stat = Stat.new(300.0, true, 0.0, 10000.0)
+@export var weapon_range: Stat = Stat.new(300.0, true, 0.0, 10000.0)
+@export var crit_chance: Stat = Stat.new(0.0, true, 0.0, 1.0)
+@export var crit_damage: Stat = Stat.new(1.5, true, 1.0, 10.0)
+
+@export_subgroup("Scaling")
+@export var damage_scaling: Stat = Stat.new(1.0, true, 0.0, 2.0)
+@export var fire_rate_scaling: Stat = Stat.new(1.0, true, 0.0, 2.0)
+@export var projectile_speed_scaling: Stat = Stat.new(1.0, true, 0.0, 2.0)
+@export var range_scaling: Stat = Stat.new(1.0, true, 0.0, 2.0)
+@export var crit_chance_scaling: Stat = Stat.new(1.0, true, 0.0, 2.0)
+@export var crit_damage_scaling: Stat = Stat.new(1.0, true, 0.0, 2.0)
 
 ## Component references
 var damage_component: DamageComponent = null
@@ -170,6 +180,16 @@ func _bind_stats_to_components() -> void:
 		# Also bind to collision shape radius
 		if targeting_shape and targeting_shape.shape is CircleShape2D:
 			final_range.bind_to_property(targeting_shape.shape, "radius")
+	
+	# Bind continuous fire settings
+	if weapon_component:
+		weapon_component.fire_mode = fire_mode
+		weapon_component.stop_condition = stop_condition
+		weapon_component.fire_interval = fire_interval
+		weapon_component.max_shots = max_shots
+		weapon_component.max_duration = max_duration
+		weapon_component.fire_on_start = fire_on_start
+		weapon_component.cooldown_after_stop = cooldown_after_stop
 
 func _connect_signals() -> void:
 	# Connect weapon component signals
@@ -270,3 +290,17 @@ func get_final_stat(stat_name: String) -> float:
 		_:
 			push_warning("WeaponNode: Unknown final stat: " + stat_name)
 			return 0.0
+
+func stop_continuous_fire() -> void:
+	if weapon_component:
+		weapon_component.stop_continuous_fire()
+
+func cancel_continuous_fire() -> void:
+	if weapon_component:
+		weapon_component.cancel_continuous_fire()
+
+func is_continuous_firing() -> bool:
+	return weapon_component.is_continuous_firing() if weapon_component else false
+
+func get_continuous_fire_progress() -> float:
+	return weapon_component.get_continuous_fire_progress() if weapon_component else 0.0

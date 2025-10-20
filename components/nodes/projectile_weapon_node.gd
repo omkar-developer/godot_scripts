@@ -1,4 +1,5 @@
 @tool
+@icon("res://scripts/icons/projectile.svg")
 class_name ProjectileWeaponNode
 extends WeaponNode
 

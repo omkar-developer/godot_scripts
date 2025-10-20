@@ -1,3 +1,4 @@
+@icon("res://scripts/icons/enemy.svg")
 class_name BaseEnemy
 extends BaseEntity
 

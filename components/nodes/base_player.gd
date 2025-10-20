@@ -1,3 +1,4 @@
+@icon("res://scripts/icons/player.svg")
 class_name BasePlayer
 extends BaseEntity
 
