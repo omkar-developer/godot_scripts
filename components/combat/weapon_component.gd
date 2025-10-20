@@ -47,6 +47,7 @@ func update(delta: float) -> void:
 
 func fire() -> bool:
 	if not can_fire():
+		start_cooldown()
 		return false
 	
 	_execute_fire()

@@ -9,6 +9,12 @@ enum DirectionMode {
 	CUSTOM
 }
 
+enum NoTargetBehavior {
+	DONT_FIRE,
+	RANDOM_DIRECTION,
+	OWNER_FORWARD
+}
+
 var projectile_scene: PackedScene = null
 var damage_component: DamageComponent = null
 var targeting_component: TargetingComponent = null
@@ -20,6 +26,20 @@ var projectile_speed: float = 300.0
 var direction_mode: DirectionMode = DirectionMode.TO_TARGET
 var custom_direction: Vector2 = Vector2.RIGHT
 var inherit_owner_velocity: bool = false
+var no_target_behavior: NoTargetBehavior = NoTargetBehavior.OWNER_FORWARD
+var projectile_collision_layer: int = 1
+var projectile_collision_mask: int = 1
+var projectile_properties: Dictionary[String, Variant] = {}
+
+enum SpreadMode {
+	EVEN,      # Evenly distributed across cone
+	RANDOM     # Random within cone
+}
+
+# Add these new properties after existing ones:
+var spread_mode: SpreadMode = SpreadMode.EVEN
+var cycle_targets: bool = false
+var target_cycle_index: int = 0
 
 signal projectile_spawned(projectile: Node, target: Node)
 signal projectile_spawn_failed()
@@ -38,6 +58,18 @@ func _init(
 	projectile_scene = _projectile_scene
 	damage_component = _damage_component
 	targeting_component = _targeting_component
+
+func can_fire() -> bool:
+	if not super.can_fire():
+		return false
+	
+	# Check no-target behavior
+	if no_target_behavior == NoTargetBehavior.DONT_FIRE:
+		var has_target = targeting_component and targeting_component.get_best_target() != null
+		if not has_target:
+			return false
+	
+	return true
 
 func _execute_fire() -> void:
 	if not projectile_scene:
@@ -88,10 +120,21 @@ func _get_projectile_target(index: int) -> Node:
 	if not targeting_component:
 		return null
 	
+	# Single projectile - get best target
 	if projectiles_per_shot == 1:
 		return targeting_component.get_best_target()
 	
 	var targets = targeting_component.get_best_targets()
+	if targets.is_empty():
+		return null
+	
+	# Cycle targets mode - rotate through targets list
+	if cycle_targets:
+		var target_index = target_cycle_index % targets.size()
+		target_cycle_index += 1
+		return targets[target_index]
+	
+	# Default - use index-based targeting
 	return targets[index] if index < targets.size() else null
 
 func _calculate_spawn_position() -> Vector2:
@@ -106,6 +149,8 @@ func _calculate_projectile_direction(target: Node, index: int) -> Vector2:
 	
 	match direction_mode:
 		DirectionMode.TO_TARGET:
+			if no_target_behavior == NoTargetBehavior.RANDOM_DIRECTION and not target:
+				base_direction = Vector2.RIGHT.rotated(randf() * TAU)
 			if target and target is Node2D:
 				if owner is Node2D:
 					base_direction = (target.global_position - (owner as Node2D).global_position).normalized()
@@ -144,6 +189,12 @@ func _calculate_spread_offset(index: int) -> float:
 		return 0.0
 	
 	var half_spread = spread_angle / 2.0
+	
+	# Random spread mode
+	if spread_mode == SpreadMode.RANDOM:
+		return randf_range(-half_spread, half_spread)
+	
+	# Even spread mode (existing logic)
 	var step = spread_angle / (projectiles_per_shot - 1) if projectiles_per_shot > 1 else 0.0
 	return -half_spread + (step * index)
 
@@ -151,6 +202,33 @@ func _get_owner_forward() -> Vector2:
 	if owner is Node2D:
 		return Vector2.RIGHT.rotated((owner as Node2D).global_rotation)
 	return Vector2.RIGHT
+
+## Apply custom properties to projectile using nested property paths
+func _apply_projectile_properties(projectile: Node) -> void:
+	for property_path in projectile_properties.keys():
+		var value = projectile_properties[property_path]
+		_set_nested_property(projectile, property_path, value)
+
+## Set nested property using dot notation (e.g., "sprite.modulate")
+func _set_nested_property(entity: Node, property_path: String, value: Variant) -> void:
+	var parts := property_path.split(".")
+	var current: Variant = entity
+	
+	# Navigate to the nested object
+	for i in range(parts.size() - 1):
+		var part := parts[i]
+		if current.get(part) == null:
+			push_warning("ProjectileWeapon: Property path '%s' not found (stopped at '%s')" % [property_path, part])
+			return
+		current = current.get(part)
+	
+	# Set the final property
+	var final_property := parts[-1]
+	if current.get(final_property) == null and not (current is Node and current.has_method("set")):
+		push_warning("ProjectileWeapon: Property '%s' not found on '%s'" % [final_property, current])
+		return
+	
+	current.set(final_property, value)
 
 func _setup_projectile(projectile: Node, spawn_pos: Vector2, direction: Vector2, target: Node) -> void:
 	if projectile is Node2D:
@@ -177,6 +255,11 @@ func _setup_projectile(projectile: Node, spawn_pos: Vector2, direction: Vector2,
 	
 	if "speed" in projectile:
 		projectile.speed = projectile_speed
+	
+	if projectile.has_method("set_collision"):
+		projectile.set_collision(projectile_collision_layer, projectile_collision_mask)
+	
+	_apply_projectile_properties(projectile)
 
 func set_projectile_scene(scene: PackedScene) -> void:
 	projectile_scene = scene

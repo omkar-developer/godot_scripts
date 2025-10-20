@@ -59,6 +59,61 @@ extends WeaponNode
 	get:
 		return projectile_weapon.spawn_parent if projectile_weapon else spawn_parent
 
+@export_flags_2d_physics var projectile_collision_layer: int = 8:
+	set(value):
+		projectile_collision_layer = value
+		if projectile_weapon:
+			projectile_weapon.projectile_collision_layer = value
+	get:
+		return projectile_weapon.projectile_collision_layer if projectile_weapon else projectile_collision_layer
+
+@export_flags_2d_physics var projectile_collision_mask: int = 2:
+	set(value):
+		projectile_collision_mask = value
+		if projectile_weapon:
+			projectile_weapon.projectile_collision_mask = value
+	get:
+		return projectile_weapon.projectile_collision_mask if projectile_weapon else projectile_collision_mask
+
+@export var projectile_properties: Dictionary[String, Variant] = {}:
+	set(value):
+		projectile_properties = value
+		if projectile_weapon:
+			projectile_weapon.projectile_properties = value
+	get:
+		if projectile_weapon:
+			return projectile_weapon.projectile_properties if projectile_weapon.projectile_properties != null else projectile_properties
+		else:
+			if projectile_properties != null:
+				return projectile_properties
+			else:
+				return {}
+
+
+@export var spread_mode: ProjectileWeapon.SpreadMode = ProjectileWeapon.SpreadMode.EVEN:
+	set(value):
+		spread_mode = value
+		if projectile_weapon:
+			projectile_weapon.spread_mode = value
+	get:
+		return projectile_weapon.spread_mode if projectile_weapon else spread_mode
+
+@export var cycle_targets: bool = false:
+	set(value):
+		cycle_targets = value
+		if projectile_weapon:
+			projectile_weapon.cycle_targets = value
+	get:
+		return projectile_weapon.cycle_targets if projectile_weapon else cycle_targets
+
+@export var no_target_behavior: ProjectileWeapon.NoTargetBehavior = ProjectileWeapon.NoTargetBehavior.OWNER_FORWARD:
+	set(value):
+		no_target_behavior = value
+		if projectile_weapon:
+			projectile_weapon.no_target_behavior = value
+	get:
+		return projectile_weapon.no_target_behavior if projectile_weapon else no_target_behavior
+
 ## Reference to the ProjectileWeapon component
 var projectile_weapon: ProjectileWeapon = null
 
@@ -84,6 +139,12 @@ func _setup_weapon_component() -> void:
 	_projectile_weapon.custom_direction = custom_direction
 	_projectile_weapon.inherit_owner_velocity = inherit_owner_velocity
 	_projectile_weapon.spawn_parent = spawn_parent
+	_projectile_weapon.projectile_collision_layer = projectile_collision_layer
+	_projectile_weapon.projectile_collision_mask = projectile_collision_mask
+	_projectile_weapon.projectile_properties = projectile_properties
+	_projectile_weapon.spread_mode = spread_mode
+	_projectile_weapon.cycle_targets = cycle_targets
+	_projectile_weapon.no_target_behavior = no_target_behavior
 	
 	projectile_weapon = _projectile_weapon
 	# Set as weapon_component for base class

@@ -25,6 +25,17 @@ func _init(
 		damage_component.damage_applied.connect(_on_damage_applied)
 		damage_component.damage_failed.connect(_on_damage_failed)
 
+func can_fire() -> bool:
+	if not super.can_fire():
+		return false
+	
+	if not damage_component or not targeting_component:
+		return false
+	
+	# Check if we have valid targets
+	var target = targeting_component.get_best_target()
+	return target != null
+
 func _execute_fire() -> void:
 	if not damage_component or not targeting_component:
 		push_warning("ImmediateWeapon: Missing damage_component or targeting_component")
