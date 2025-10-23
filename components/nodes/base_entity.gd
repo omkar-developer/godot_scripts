@@ -134,6 +134,8 @@ var damage_component: DamageComponent
 var floating_text_component: FloatingTextComponent
 var label_spawner: LabelSpawner
 
+var using_local_text_spawner: bool = false
+
 #endregion
 
 #region Static & Internal
@@ -195,15 +197,17 @@ func _setup_visual_feedback() -> void:
 		return
 	
 	# Use shared spawner if available, otherwise create local one
-	if shared_label_spawner == null:
+	if shared_label_spawner == null and label_spawner == null:
 		label_spawner = LabelSpawner.new(get_parent(), 20)
 		label_spawner.configure_defaults(16, true, Color.BLACK, 2)
 	else:
 		label_spawner = shared_label_spawner
 	
-	floating_text_component = FloatingTextComponent.new(self, get_parent(), label_spawner)
-	floating_text_component.float_speed = 60.0
-	floating_text_component.duration = 1.2
+	if floating_text_component == null:
+		floating_text_component = FloatingTextComponent.new(self, get_parent(), label_spawner)
+		floating_text_component.float_speed = 60.0
+		floating_text_component.duration = 1.2
+		using_local_text_spawner = true
 
 
 func _connect_signals() -> void:
@@ -233,7 +237,7 @@ func _update_components(delta: float) -> void:
 	if look_component and look_enabled:
 		look_component.update(delta)
 	
-	if floating_text_component:
+	if floating_text_component and using_local_text_spawner:
 		floating_text_component.update(delta)
 
 #endregion

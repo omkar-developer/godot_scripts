@@ -222,6 +222,9 @@ var _auto_start_timer: float = 0.0
 ## Internal flag for auto-start
 var _waiting_for_auto_start: bool = false
 
+var _label_spawner: LabelSpawner
+var floating_text_component : FloatingTextComponent
+
 ## --- SIGNALS ---
 
 ## Emitted when an entity is spawned.[br]
@@ -251,6 +254,13 @@ signal wave_completed(wave_number: int)
 ## Emitted when spawn list completes (LIST mode only).
 signal list_completed()
 
+func _enter_tree() -> void:
+	_label_spawner = LabelSpawner.new(get_parent(), 20)
+	_label_spawner.configure_defaults(16, true, Color.BLACK, 2)
+	floating_text_component = FloatingTextComponent.new(self, get_parent(), _label_spawner)
+	floating_text_component.float_speed = 60.0
+	floating_text_component.duration = 1.2
+
 
 func _ready() -> void:
 	# Parse scene properties JSON if in editor
@@ -276,6 +286,8 @@ func _process(delta: float) -> void:
 	# Editor: just redraw if needed
 	if Engine.is_editor_hint():
 		return
+
+	floating_text_component.update(delta)
 	
 	# Handle auto-start delay
 	if _waiting_for_auto_start:
@@ -421,6 +433,11 @@ func spawn_entity(scene_index: int = -1, spawn_position: Variant = null) -> Node
 			entity.global_position = spawn_position
 		else:
 			entity.global_position = _get_spawn_position()
+
+	if "label_spawner" in entity:
+		entity.label_spawner = _label_spawner
+		
+		entity.floating_text_component = floating_text_component
 	
 	# Add to scene
 	parent.add_child(entity)
