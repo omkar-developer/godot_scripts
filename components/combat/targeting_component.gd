@@ -80,8 +80,8 @@ var detect_bodies: bool = true
 var detect_areas: bool = true
 
 ## Custom filter/priority function for target validation and selection.[br]
-## When priority = CUSTOM: func(targets: Array[Node]) -> Node (returns best target).[br]
-## When priority != CUSTOM: func(target: Node) -> bool (validates if target is allowed).
+## When priority = CUSTOM: func(targets: Array[Node2D]) -> Node2D (returns best target).[br]
+## When priority != CUSTOM: func(target: Node2D) -> bool (validates if target is allowed).
 var target_filter: Callable = Callable()
 
 ## Internal timer for AUTO update mode
@@ -112,20 +112,25 @@ var shape_type: ShapeType = ShapeType.CUSTOM
 signal range_changed(new_range: float, old_range: float)
 
 ## Emitted when a new target enters detection range and passes validation.[br]
-## [param target]: The Node that entered detection.
-signal target_found(target: Node)
+## [param target]: The Node2D that entered detection.
+signal target_found(target: Node2D)
 
 ## Emitted when a target leaves detection range or becomes invalid.[br]
-## [param target]: The Node that left detection.
-signal target_lost(target: Node)
+## [param target]: The Node2D that left detection.
+signal target_lost(target: Node2D)
 
 ## Emitted when tracked targets change (any update mode except MANUAL).[br]
 ## [param new_targets]: Array of currently tracked targets (size = target_count).
-signal targets_changed(new_targets: Array[Node])
+signal targets_changed(new_targets: Array[Node2D])
 
 ## Emitted when target list reaches max_targets limit.[br]
 ## [param rejected_target]: The target that couldn't be added.
-signal target_limit_reached(rejected_target: Node)
+signal target_limit_reached(rejected_target: Node2D)
+
+# Fast-path optimization flags
+var _can_use_single_fast_path: bool = false
+var _can_use_multi_first_seen_fast_path: bool = false
+var _can_use_multi_random_fast_path: bool = false
 
 ## Constructor.[br]
 ## [param _owner]: The Object that owns this component (can be RefCounted).[br]
@@ -134,11 +139,35 @@ signal target_limit_reached(rejected_target: Node)
 func _init(_owner: Object, _area: Area2D = null, _priority: Priority = Priority.CLOSEST) -> void:
 	owner = _owner
 	priority = _priority
+	_update_fast_path_flags()
 	
 	if _area:
 		set_detection_area(_area)
 	else:
 		_auto_detect_area()
+
+
+## Internal: Update fast-path optimization flags based on current settings
+func _update_fast_path_flags() -> void:
+	var no_filter = not target_filter.is_valid()
+	
+	_can_use_single_fast_path = (
+		target_count == 1 and 
+		no_filter and 
+		priority in [Priority.FIRST_SEEN, Priority.LAST_SEEN, Priority.RANDOM]
+	)
+	
+	_can_use_multi_first_seen_fast_path = (
+		target_count > 1 and 
+		priority == Priority.FIRST_SEEN and 
+		no_filter
+	)
+	
+	_can_use_multi_random_fast_path = (
+		target_count > 1 and 
+		priority == Priority.RANDOM and 
+		no_filter
+	)
 
 
 ## Internal: Try to auto-detect Area2D from owner.
@@ -218,7 +247,9 @@ func _detect_collision_shape() -> void:
 		shape_type = ShapeType.CAPSULE
 	else:
 		shape_type = ShapeType.CUSTOM
-		push_warning("TargetingComponent: Custom shape detected, use range_changed signal for manual scaling")
+		push_warning(
+			"TargetingComponent: Custom shape detected, use range_changed signal for manual scaling"
+			)
 	
 	if auto_update_shape:
 		_update_collision_shape(detection_range)
@@ -275,9 +306,9 @@ func force_update_shape() -> void:
 
 ## Get the best target (single target mode).[br]
 ## [param force_recalculate]: Force recalculation regardless of update mode.[br]
-## [return]: The best target Node, or null if no valid targets.
-func get_best_target(force_recalculate: bool = false) -> Node:
-	if update_mode == UpdateMode.MANUAL or force_recalculate:
+## [return]: The best target Node2D, or null if no valid targets.
+func get_best_target(force_recalculate: bool = false) -> Node2D:
+	if force_recalculate:
 		_recalculate_targets()
 	
 	return tracked_targets[0] if not tracked_targets.is_empty() else null
@@ -286,8 +317,8 @@ func get_best_target(force_recalculate: bool = false) -> Node:
 ## Get multiple best targets (multi-target mode).[br]
 ## [param force_recalculate]: Force recalculation regardless of update mode.[br]
 ## [return]: Array of best targets (size up to target_count).
-func get_best_targets(force_recalculate: bool = false) -> Array[Node]:
-	if update_mode == UpdateMode.MANUAL or force_recalculate:
+func get_best_targets(force_recalculate: bool = false) -> Array[Node2D]:
+	if force_recalculate:
 		_recalculate_targets()
 	
 	return tracked_targets.duplicate()
@@ -307,7 +338,7 @@ func update(delta: float) -> void:
 
 ## Get all currently valid targets.[br]
 ## [return]: Array of valid target Nodes (copy of internal list).
-func get_all_targets() -> Array[Node]:
+func get_all_targets() -> Array[Node2D]:
 	return valid_targets.duplicate()
 
 
@@ -323,24 +354,24 @@ func get_tracked_count() -> int:
 	return tracked_targets.size()
 
 
-## Check if a specific node is currently in detection range.[br]
-## [param target]: The Node to check.[br]
+## Check if a specific Node2D is currently in detection range.[br]
+## [param target]: The Node2D to check.[br]
 ## [return]: true if target is in valid_targets list.
-func has_target(target: Node) -> bool:
+func has_target(target: Node2D) -> bool:
 	return valid_targets.has(target)
 
 
-## Check if a specific node is currently being tracked.[br]
-## [param target]: The Node to check.[br]
+## Check if a specific Node2D is currently being tracked.[br]
+## [param target]: The Node2D to check.[br]
 ## [return]: true if target is in tracked_targets list.
-func is_tracking(target: Node) -> bool:
+func is_tracking(target: Node2D) -> bool:
 	return tracked_targets.has(target)
 
 
 ## Manually add a target (bypasses area detection).[br]
-## [param target]: The Node to add as a target.[br]
+## [param target]: The Node2D to add as a target.[br]
 ## [return]: true if successfully added.
-func add_target(target: Node) -> bool:
+func add_target(target: Node2D) -> bool:
 	if not is_instance_valid(target) or valid_targets.has(target):
 		return false
 	
@@ -357,6 +388,23 @@ func add_target(target: Node) -> bool:
 	valid_targets.append(target)
 	target_found.emit(target)
 	
+	# Fast paths only auto-update in ON_ENTER, ON_EXIT, AUTO modes
+	if update_mode != UpdateMode.MANUAL and update_mode != UpdateMode.ON_TARGET_LOST:
+		# Fast path: Single target optimizations
+		if _can_use_single_fast_path:
+			_fast_path_single_target_entered(target)
+			return true
+		
+		# Fast path: Multi-target FIRST_SEEN
+		if _can_use_multi_first_seen_fast_path:
+			_fast_path_multi_first_seen_entered(target)
+			return true
+		
+		# Fast path: Multi-target RANDOM  
+		if _can_use_multi_random_fast_path:
+			_fast_path_multi_random_entered(target)
+			return true
+	
 	# Trigger update based on mode
 	if update_mode == UpdateMode.ON_ENTER or _should_update_on_entry():
 		_recalculate_targets()
@@ -365,12 +413,29 @@ func add_target(target: Node) -> bool:
 
 
 ## Manually remove a target.[br]
-## [param target]: The Node to remove from targets.[br]
+## [param target]: The Node2D to remove from targets.[br]
 ## [return]: true if target was removed.
-func remove_target(target: Node) -> bool:
+func remove_target(target: Node2D) -> bool:
 	if valid_targets.has(target):
 		valid_targets.erase(target)
 		target_lost.emit(target)
+		
+		# Fast paths only auto-update in ON_ENTER, ON_EXIT, AUTO modes (not MANUAL)
+		if update_mode != UpdateMode.MANUAL:
+			# Fast path: Single target optimizations
+			if _can_use_single_fast_path:
+				_fast_path_single_target_exited(target)
+				return true
+			
+			# Fast path: Multi-target FIRST_SEEN
+			if _can_use_multi_first_seen_fast_path:
+				_fast_path_multi_first_seen_exited(target)
+				return true
+			
+			# Fast path: Multi-target RANDOM
+			if _can_use_multi_random_fast_path:
+				_fast_path_multi_random_exited(target)
+				return true
 		
 		# Trigger update based on mode
 		if update_mode == UpdateMode.ON_EXIT or _should_update_on_loss(target):
@@ -400,15 +465,16 @@ func clear_invalid_targets() -> int:
 
 
 ## Set custom target filter function.[br]
-## For Priority.CUSTOM: func(targets: Array[Node]) -> Node (select best).[br]
-## For other priorities: func(target: Node) -> bool (validate target).[br]
+## For Priority.CUSTOM: func(targets: Array[Node2D]) -> Node2D (select best).[br]
+## For other priorities: func(target: Node2D) -> bool (validate target).[br]
 ## [param filter_func]: Callable with appropriate signature.[br]
 ## [param revalidate_existing]: Whether to revalidate existing targets.
 func set_target_filter(filter_func: Callable, revalidate_existing: bool = false) -> void:
 	target_filter = filter_func
+	_update_fast_path_flags()
 	
 	if revalidate_existing and target_filter.is_valid() and priority != Priority.CUSTOM:
-		var to_remove: Array[Node] = []
+		var to_remove: Array[Node2D] = []
 		for target in valid_targets:
 			if not target_filter.call(target):
 				to_remove.append(target)
@@ -420,6 +486,7 @@ func set_target_filter(filter_func: Callable, revalidate_existing: bool = false)
 ## Clear the custom target filter.
 func clear_target_filter() -> void:
 	target_filter = Callable()
+	_update_fast_path_flags()
 
 
 ## Change targeting priority mode.[br]
@@ -427,6 +494,7 @@ func clear_target_filter() -> void:
 func set_priority(new_priority: Priority) -> void:
 	if priority != new_priority:
 		priority = new_priority
+		_update_fast_path_flags()
 
 
 ## Change update mode.[br]
@@ -440,6 +508,7 @@ func set_update_mode(new_mode: UpdateMode) -> void:
 ## [param count]: Number of targets to track (1 = single, >1 = multiple).
 func set_target_count(count: int) -> void:
 	target_count = maxi(1, count)
+	_update_fast_path_flags()
 
 
 ## Internal: Check if should update when target enters (for ON_TARGET_LOST mode).
@@ -449,7 +518,7 @@ func _should_update_on_entry() -> bool:
 
 
 ## Internal: Check if should update when target lost (for ON_TARGET_LOST mode).
-func _should_update_on_loss(target: Node) -> bool:
+func _should_update_on_loss(target: Node2D) -> bool:
 	# In ON_TARGET_LOST mode, only update if the lost target was being tracked
 	return update_mode == UpdateMode.ON_TARGET_LOST and tracked_targets.has(target)
 
@@ -469,14 +538,21 @@ func _recalculate_targets() -> void:
 	
 	var new_tracked: Array[Node2D] = []
 	
-	# Single target optimization
-	if target_count == 1:
-		var best = _get_single_best_target()
-		if best:
-			new_tracked.append(best)
+	# Check for fast paths first
+	if _can_use_single_fast_path:
+		new_tracked = _fast_path_get_single_target()
+	elif _can_use_multi_first_seen_fast_path:
+		new_tracked = _fast_path_get_multi_first_seen()
+	elif _can_use_multi_random_fast_path:
+		new_tracked = _fast_path_get_multi_random()
 	else:
-		# Multiple targets
-		new_tracked = _get_multiple_best_targets()
+		# Fall back to original logic
+		if target_count == 1:
+			var best = _get_single_best_target()
+			if best:
+				new_tracked.append(best)
+		else:
+			new_tracked = _get_multiple_best_targets()
 	
 	# Check if targets actually changed
 	if _targets_differ(tracked_targets, new_tracked):
@@ -497,7 +573,7 @@ func _targets_differ(old: Array[Node2D], new: Array[Node2D]) -> bool:
 
 
 ## Internal: Get single best target based on priority.
-func _get_single_best_target() -> Node:
+func _get_single_best_target() -> Node2D:
 	match priority:
 		Priority.CLOSEST:
 			return _get_closest_target()
@@ -516,9 +592,9 @@ func _get_single_best_target() -> Node:
 		Priority.CUSTOM:
 			if target_filter.is_valid():
 				return target_filter.call(valid_targets.duplicate())
-			else:
-				push_warning("TargetingComponent: CUSTOM priority requires target_filter to be set")
-				return valid_targets[0] if not valid_targets.is_empty() else null
+			
+			push_warning("TargetingComponent: CUSTOM priority requires target_filter to be set")
+			return valid_targets[0] if not valid_targets.is_empty() else null
 	
 	return null
 
@@ -558,27 +634,27 @@ func _get_multiple_best_targets() -> Array[Node2D]:
 
 
 ## Internal: Handle body entering detection area.
-func _on_body_entered(body: Node) -> void:
+func _on_body_entered(body: Node2D) -> void:
 	_handle_target_entered(body)
 
 
 ## Internal: Handle area entering detection area.
-func _on_area_entered(area: Node) -> void:
+func _on_area_entered(area: Node2D) -> void:
 	_handle_target_entered(area)
 
 
 ## Internal: Handle body exiting detection area.
-func _on_body_exited(body: Node) -> void:
+func _on_body_exited(body: Node2D) -> void:
 	_handle_target_exited(body)
 
 
 ## Internal: Handle area exiting detection area.
-func _on_area_exited(area: Node) -> void:
+func _on_area_exited(area: Node2D) -> void:
 	_handle_target_exited(area)
 
 
 ## Internal: Common logic for target entering.
-func _handle_target_entered(target: Node) -> void:
+func _handle_target_entered(target: Node2D) -> void:
 	# Avoid duplicates
 	if valid_targets.has(target):
 		return
@@ -596,16 +672,50 @@ func _handle_target_entered(target: Node) -> void:
 	valid_targets.append(target)
 	target_found.emit(target)
 	
+	# Fast paths only auto-update in ON_ENTER, ON_EXIT, AUTO modes
+	if update_mode != UpdateMode.MANUAL and update_mode != UpdateMode.ON_TARGET_LOST:
+		# Fast path: Single target optimizations
+		if _can_use_single_fast_path:
+			_fast_path_single_target_entered(target)
+			return
+		
+		# Fast path: Multi-target FIRST_SEEN
+		if _can_use_multi_first_seen_fast_path:
+			_fast_path_multi_first_seen_entered(target)
+			return
+		
+		# Fast path: Multi-target RANDOM  
+		if _can_use_multi_random_fast_path:
+			_fast_path_multi_random_entered(target)
+			return
+	
 	# Trigger update based on mode
 	if update_mode == UpdateMode.ON_ENTER or _should_update_on_entry():
 		_recalculate_targets()
 
 
 ## Internal: Common logic for target exiting.
-func _handle_target_exited(target: Node) -> void:
+func _handle_target_exited(target: Node2D) -> void:
 	if valid_targets.has(target):
 		valid_targets.erase(target)
 		target_lost.emit(target)
+		
+		# Fast paths only auto-update in ON_ENTER, ON_EXIT, AUTO modes (not MANUAL)
+		if update_mode != UpdateMode.MANUAL:
+			# Fast path: Single target optimizations
+			if _can_use_single_fast_path:
+				_fast_path_single_target_exited(target)
+				return
+			
+			# Fast path: Multi-target FIRST_SEEN
+			if _can_use_multi_first_seen_fast_path:
+				_fast_path_multi_first_seen_exited(target)
+				return
+			
+			# Fast path: Multi-target RANDOM
+			if _can_use_multi_random_fast_path:
+				_fast_path_multi_random_exited(target)
+				return
 		
 		# Trigger update based on mode
 		if update_mode == UpdateMode.ON_EXIT or _should_update_on_loss(target):
@@ -629,12 +739,12 @@ func _scan_existing_targets() -> void:
 
 
 ## Internal: Find closest target by distance.
-func _get_closest_target() -> Node:
+func _get_closest_target() -> Node2D:
 	if not owner is Node2D:
 		return valid_targets[0] if not valid_targets.is_empty() else null
 	
 	var owner_node = owner as Node2D  # Changed to Node2D
-	var closest: Node = null
+	var closest: Node2D = null
 	var min_dist = INF
 	
 	for target in valid_targets:
@@ -744,7 +854,7 @@ func _sort_by_health(targets: Array[Node2D], ascending: bool) -> Array[Node2D]:
 
 ## Internal: Get health from target (duck typing).[br]
 ## [return]: Health value or -1.0 if target has no health method.
-func _get_target_health(target: Node) -> float:
+func _get_target_health(target: Node2D) -> float:
 	# Try get_health() method first
 	if target.has_method("get_health"):
 		return target.get_health()
@@ -754,8 +864,7 @@ func _get_target_health(target: Node) -> float:
 		var health_prop = target.get("health")
 		if health_prop is float or health_prop is int:
 			return float(health_prop)
-		elif health_prop is Stat:
-			return health_prop.get_value()
+		return health_prop.get_value()
 	
 	return -1.0
 
@@ -784,3 +893,185 @@ func _cleanup_invalid_targets() -> int:
 		i -= 1
 	
 	return removed
+
+# ==============================================================================
+# FAST PATH OPTIMIZATIONS
+# ==============================================================================
+
+## Fast path: Handle single target entry for FIRST_SEEN, LAST_SEEN, RANDOM
+func _fast_path_single_target_entered(target: Node2D) -> void:
+	if auto_cleanup: _cleanup_invalid_targets()
+
+	var old_tracked = tracked_targets.duplicate()
+	
+	match priority:
+		Priority.FIRST_SEEN:
+			# Track first target and never switch until it exits
+			if tracked_targets.is_empty():
+				tracked_targets = [target]
+		
+		Priority.LAST_SEEN:
+			# Always replace with newest target
+			tracked_targets = [target]
+		
+		Priority.RANDOM:
+			if tracked_targets.is_empty():
+				tracked_targets = [target]
+			else:
+				# 50% chance to replace
+				if randf() < 0.5:
+					tracked_targets = [target]
+	
+	# Emit signal if targets changed
+	if _targets_differ(old_tracked, tracked_targets):
+		targets_changed.emit(tracked_targets)
+
+
+## Fast path: Handle single target exit for FIRST_SEEN, LAST_SEEN, RANDOM
+func _fast_path_single_target_exited(target: Node2D) -> void:
+	if auto_cleanup: _cleanup_invalid_targets()
+
+	var old_tracked = tracked_targets.duplicate()
+	
+	# If the exited target was being tracked, update tracked targets
+	if tracked_targets.size() == 1 and tracked_targets[0] == target:
+		match priority:
+			Priority.FIRST_SEEN:
+				# Take the next first target (if any)
+				tracked_targets = [valid_targets[0]] if not valid_targets.is_empty() else []
+			
+			Priority.LAST_SEEN:
+				# Take the last target (if any)
+				tracked_targets = [valid_targets[-1]] if not valid_targets.is_empty() else []
+			
+			Priority.RANDOM:
+				# Pick a new random target (if any)
+				if not valid_targets.is_empty():
+					tracked_targets = [valid_targets.pick_random()]
+				else:
+					tracked_targets = []
+	
+	# Emit signal if targets changed
+	if _targets_differ(old_tracked, tracked_targets):
+		targets_changed.emit(tracked_targets)
+
+
+## Fast path: Get single target for manual recalculation
+func _fast_path_get_single_target() -> Array[Node2D]:
+	if valid_targets.is_empty():
+		return []
+	
+	match priority:
+		Priority.FIRST_SEEN:
+			return [valid_targets[0]]
+		Priority.LAST_SEEN:
+			return [valid_targets[-1]]
+		Priority.RANDOM:
+			return [valid_targets.pick_random()]
+	
+	return []
+
+
+## Fast path: Handle multi-target FIRST_SEEN entry
+func _fast_path_multi_first_seen_entered(_target: Node2D) -> void:
+	if auto_cleanup: _cleanup_invalid_targets()
+
+	var old_tracked = tracked_targets.duplicate()
+	
+	# Simply take the first target_count targets
+	if tracked_targets.size() < target_count:
+		tracked_targets = valid_targets.slice(0, min(target_count, valid_targets.size()))
+	
+	# Emit signal if targets changed
+	if _targets_differ(old_tracked, tracked_targets):
+		targets_changed.emit(tracked_targets)
+
+
+## Fast path: Handle multi-target FIRST_SEEN exit
+func _fast_path_multi_first_seen_exited(target: Node2D) -> void:
+	if auto_cleanup: _cleanup_invalid_targets()
+
+	var old_tracked = tracked_targets.duplicate()
+	
+	# Remove the target if it was tracked
+	if tracked_targets.has(target):
+		tracked_targets.erase(target)
+	
+	# Fill any empty slots with the next available targets
+	if tracked_targets.size() < target_count and valid_targets.size() > tracked_targets.size():
+		var start_index = tracked_targets.size()
+		var end_index = min(valid_targets.size(), target_count)
+		for i in range(start_index, end_index):
+			tracked_targets.append(valid_targets[i])
+	
+	# Emit signal if targets changed
+	if _targets_differ(old_tracked, tracked_targets):
+		targets_changed.emit(tracked_targets)
+
+
+## Fast path: Get multi-target FIRST_SEEN for manual recalculation
+func _fast_path_get_multi_first_seen() -> Array[Node2D]:
+	return valid_targets.slice(0, min(target_count, valid_targets.size()))
+
+
+## Fast path: Handle multi-target RANDOM entry
+func _fast_path_multi_random_entered(target: Node2D) -> void:
+	if auto_cleanup: _cleanup_invalid_targets()
+
+	var old_tracked = tracked_targets.duplicate()
+	
+	if tracked_targets.size() < target_count:
+		# Add new target if we have room
+		tracked_targets.append(target)
+	else:
+		# Randomly decide whether to replace an existing target
+		var replace_index = randi() % target_count
+		tracked_targets[replace_index] = target
+	
+	# Emit signal if targets changed
+	if _targets_differ(old_tracked, tracked_targets):
+		targets_changed.emit(tracked_targets)
+
+
+## Fast path: Handle multi-target RANDOM exit
+func _fast_path_multi_random_exited(target: Node2D) -> void:
+	if auto_cleanup: _cleanup_invalid_targets()
+
+	var old_tracked = tracked_targets.duplicate()
+	
+	# Remove the target if it was tracked
+	if tracked_targets.has(target):
+		tracked_targets.erase(target)
+		
+		# If we have room and available targets, add a new random one
+		if tracked_targets.size() < target_count and not valid_targets.is_empty():
+			# Get targets not currently tracked
+			var available_targets = []
+			for t in valid_targets:
+				if not tracked_targets.has(t):
+					available_targets.append(t)
+			
+			if not available_targets.is_empty():
+				tracked_targets.append(available_targets.pick_random())
+	
+	# Emit signal if targets changed
+	if _targets_differ(old_tracked, tracked_targets):
+		targets_changed.emit(tracked_targets)
+
+
+## Fast path: Get multi-target RANDOM for manual recalculation
+func _fast_path_get_multi_random() -> Array[Node2D]:
+	if valid_targets.size() <= target_count:
+		return valid_targets.duplicate()
+	
+	# Select target_count unique random elements without shuffling entire array
+	var result: Array[Node2D] = []
+	var available_indices = range(valid_targets.size())
+	
+	for i in range(target_count):
+		var random_index = randi() % available_indices.size()
+		var selected_index = available_indices[random_index]
+		result.append(valid_targets[selected_index])
+		available_indices.remove_at(random_index)
+	
+	return result

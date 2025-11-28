@@ -32,20 +32,21 @@ This separation allows WeaponComponent to be reused across player weapons, enemy
 
 ## High-Level Fire Flow
 
-```
-Cooldown ready
-    ↓
-fire() is called OR auto_fire triggers
-    ↓
-If fire_mode == SINGLE:
-  → One shot → Start cooldown
-
-If fire_mode == CONTINUOUS:
-  → Start burst
-  → Fire repeatedly
-  → Stop based on stop_condition
-  → Optional cooldown
-  → Ready for next cycle
+```mermaid
+flowchart TD
+    A["Cooldown ready"] --> B["fire() is called OR<br/>auto_fire triggers"]
+    B --> C{fire_mode}
+    C -->|SINGLE| D["Fire one shot"]
+    C -->|CONTINUOUS| E["Start burst"]
+    D --> F["Start cooldown"]
+    E --> G["Fire repeatedly"]
+    G --> H{stop_condition<br/>met?}
+    H -->|Yes| I["Stop burst"]
+    I --> J{cooldown_after_stop?}
+    J -->|Yes| K["Start cooldown"]
+    J -->|No| L["Ready for next cycle"]
+    K --> L
+    H -->|No| G
 ```
 
 ---
@@ -60,8 +61,15 @@ If fire_mode == CONTINUOUS:
 * `attack_speed_scaling`
 
 **Formula:**
-```
-cooldown = 1 / (base_fire_rate + attack_speed * attack_speed_scaling)
+
+```mermaid
+graph LR
+    A["base_fire_rate"] --> D["cooldown"]
+    B["attack_speed"] --> C["× attack_speed_scaling"]
+    C --> E["+"]
+    A --> E
+    E --> F["1 ÷"]
+    F --> D
 ```
 
 This controls how often a weapon can start a new attack cycle. This is the delay between bursts or single shots.
@@ -98,11 +106,16 @@ This controls how fast bullets come out during a continuous attack. This is NOT 
 
 ### 5. Auto Fire
 
-If `auto_fire` is true:
-
-* Weapon will retrigger itself whenever cooldown finishes
-* No input is required
-* Default for: reverse bullet hell, enemy weapons, turrets
+```mermaid
+graph TD
+    A{auto_fire = true?}
+    A -->|Yes| B["Retrigger on<br/>cooldown finish"]
+    A -->|No| C["Require external<br/>fire() call"]
+    B --> D["No input needed"]
+    C --> E["Input required"]
+    D --> F["Default for:<br/>enemy weapons<br/>turrets<br/>reverse bullet hell"]
+    E --> G["Default for:<br/>player weapons"]
+```
 
 ---
 
@@ -262,10 +275,18 @@ fire_rate = 1.5
 
 **WeaponNode** is a visual and stat wrapper for WeaponComponent.
 
-| Component | Responsibility |
-| --- | --- |
-| **WeaponNode** | Exists in scene, holds stats, holds scaling, holds targeting setup, exposes inspector properties, calls `weapon_component.update(delta)`, passes components (damage, targeting) |
-| **WeaponComponent** | Stores firing state, decides WHEN a shot is allowed, emits `fired` signal, calls `_execute_fire()` |
+```mermaid
+graph TB
+    A["WeaponNode<br/>Scene Node"] --> B["Exists in scene<br/>Holds stats<br/>Holds scaling<br/>Inspector properties"]
+    A --> C["Calls update delta"]
+    A --> D["Passes components:<br/>Damage<br/>Targeting"]
+    A --> E["WeaponComponent<br/>Logic Only"]
+    E --> F["Stores firing state<br/>Decides WHEN shot allowed<br/>Emits fired signal<br/>Calls _execute_fire"]
+    
+    G["DamageComponent"] -.->|Similar Pattern| E
+    H["HealthComponent"] -.->|Similar Pattern| E
+    I["TargetingComponent"] -.->|Similar Pattern| E
+```
 
 This design matches your global architecture:
 * `DamageComponent`

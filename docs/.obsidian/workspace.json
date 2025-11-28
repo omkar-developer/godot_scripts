@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "targeting_system.md",
-                "mode": "source",
+                "file": "weapon_system.md",
+                "mode": "preview",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "targeting_system"
+              "title": "weapon_system"
             }
           }
         ]
@@ -182,8 +182,8 @@
   },
   "active": "24ba317a255c888b",
   "lastOpenFiles": [
-    "weapon_system.md",
     "targeting_system.md",
+    "weapon_system.md",
     "stats_system.md",
     "upgrade.md"
   ]
