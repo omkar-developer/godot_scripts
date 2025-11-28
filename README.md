@@ -49,7 +49,7 @@ var ffm = FlowFieldManager.new(32, 64, 64, true)
 ```
 
 ### Stat System
-[Docs](./stats_system.md)
+[Docs](./docs/stats_system.md)
 ```gdscript
 var stat = Stat.new()
 stat.base_value = 10
@@ -59,7 +59,7 @@ print(stat.get_value()) # 18
 ```
 
 ### Upgrades System
-[Docs](./upgrade.md)
+[Docs](./docs/upgrade.md)
 A flexible and powerful **upgrade/progression system** for RPG-style stats, handling XP, levels, material requirements, and stat modifications via `StatModifierSet`s. Supports **manual or auto-upgrades**, **infinite levels**, and previewing effects before applying them.
 
 ## Godot Compatibility

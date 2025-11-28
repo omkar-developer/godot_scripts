@@ -59,10 +59,10 @@ var update_mode: UpdateMode = UpdateMode.ON_TARGET_LOST
 var target_count: int = 1
 
 ## List of currently valid targets in detection range
-var valid_targets: Array[Node] = []
+var valid_targets: Array[Node2D] = []
 
 ## Tracked best targets (size determined by target_count)
-var tracked_targets: Array[Node] = []
+var tracked_targets: Array[Node2D] = []
 
 ## Whether to automatically remove invalid targets when getting best target
 var auto_cleanup: bool = true
@@ -467,7 +467,7 @@ func _recalculate_targets() -> void:
 			targets_changed.emit(tracked_targets)
 		return
 	
-	var new_tracked: Array[Node] = []
+	var new_tracked: Array[Node2D] = []
 	
 	# Single target optimization
 	if target_count == 1:
@@ -485,7 +485,7 @@ func _recalculate_targets() -> void:
 
 
 ## Internal: Check if two target arrays differ.
-func _targets_differ(old: Array[Node], new: Array[Node]) -> bool:
+func _targets_differ(old: Array[Node2D], new: Array[Node2D]) -> bool:
 	if old.size() != new.size():
 		return true
 	
@@ -524,8 +524,8 @@ func _get_single_best_target() -> Node:
 
 
 ## Internal: Get multiple best targets based on priority.
-func _get_multiple_best_targets() -> Array[Node]:
-	var sorted_targets: Array[Node] = valid_targets.duplicate()
+func _get_multiple_best_targets() -> Array[Node2D]:
+	var sorted_targets: Array[Node2D] = valid_targets.duplicate()
 	
 	# Sort based on priority
 	match priority:
@@ -543,8 +543,12 @@ func _get_multiple_best_targets() -> Array[Node]:
 			if target_filter.is_valid():
 				# For custom multi-target, user must return array
 				var custom_result = target_filter.call(sorted_targets)
-				if custom_result is Array:
-					sorted_targets = custom_result
+				var filtered: Array[Node2D] = []
+				for t in custom_result:
+					if is_instance_valid(t):
+						filtered.append(t)
+				sorted_targets = filtered
+
 	
 	# Return up to target_count targets
 	if sorted_targets.size() > target_count:
@@ -707,11 +711,11 @@ func _get_highest_hp_target() -> Node2D:
 
 
 ## Internal: Sort targets by distance.
-func _sort_by_distance(targets: Array[Node], ascending: bool) -> Array[Node]:
-	if not owner is Node:
+func _sort_by_distance(targets: Array[Node2D], ascending: bool) -> Array[Node2D]:
+	if not owner is Node2D:
 		return targets
 	
-	var owner_node = owner as Node
+	var owner_node = owner as Node2D
 	targets.sort_custom(func(a, b):
 		var dist_a = owner_node.global_position.distance_squared_to(a.global_position)
 		var dist_b = owner_node.global_position.distance_squared_to(b.global_position)
@@ -721,8 +725,8 @@ func _sort_by_distance(targets: Array[Node], ascending: bool) -> Array[Node]:
 
 
 ## Internal: Sort targets by health.
-func _sort_by_health(targets: Array[Node], ascending: bool) -> Array[Node]:
-	var filtered_targets: Array[Node] = []
+func _sort_by_health(targets: Array[Node2D], ascending: bool) -> Array[Node2D]:
+	var filtered_targets: Array[Node2D] = []
 	
 	# Filter out targets without health
 	for target in targets:
