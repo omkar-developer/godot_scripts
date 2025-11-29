@@ -301,8 +301,9 @@ func _process(delta: float) -> void:
 		return
 	
 	# Check spawn limits
-	if _is_spawn_limit_reached():
+	if max_spawns >= 0 and total_spawned >= max_spawns:
 		stop_spawning()
+		spawn_limit_reached.emit()
 		return
 	
 	# Update spawn logic based on mode
@@ -877,7 +878,7 @@ func _connect_death_signal(entity: Node) -> void:
 		push_warning("SpawnerComponent: Entity does not have signal '%s'" % death_signal_name)
 		return
 	
-	entity.connect(death_signal_name, _on_entity_died)
+	entity.connect(death_signal_name, Callable(self, "_on_entity_died"), CONNECT_ONE_SHOT)
 
 
 ## Callback when entity dies/is destroyed.
@@ -948,11 +949,11 @@ func _draw_rectangle_area() -> void:
 		SpawnLocation.EDGE:
 			# Draw thick edges
 			var tl := rect.position
-			var tr := rect.position + Vector2(rect.size.x, 0)
+			var _tr := rect.position + Vector2(rect.size.x, 0)
 			var br := rect.position + rect.size
 			var bl := rect.position + Vector2(0, rect.size.y)
-			draw_line(tl, tr, spawn_area_color, 4.0)
-			draw_line(tr, br, spawn_area_color, 4.0)
+			draw_line(tl, _tr, spawn_area_color, 4.0)
+			draw_line(_tr, br, spawn_area_color, 4.0)
 			draw_line(br, bl, spawn_area_color, 4.0)
 			draw_line(bl, tl, spawn_area_color, 4.0)
 		

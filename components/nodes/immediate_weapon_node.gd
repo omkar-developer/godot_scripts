@@ -106,5 +106,5 @@ func set_damage_all_in_range(all: bool) -> void:
 func set_visual_effect_scene(scene: PackedScene) -> void:
 	visual_effect_scene = scene
 
-func set_spawn_visual_on_damage(enabled: bool) -> void:
-	spawn_visual_on_damage = enabled
+func set_spawn_visual_on_damage(enabled_arg: bool) -> void:
+	spawn_visual_on_damage = enabled_arg

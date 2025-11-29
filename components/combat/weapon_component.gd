@@ -2,14 +2,14 @@ class_name WeaponComponent
 extends RefCounted
 
 enum FireMode {
-	SINGLE,           # Fire once, then cooldown
-	CONTINUOUS        # Fire repeatedly, stop based on condition
+	SINGLE,           ## Fire once, then cooldown
+	CONTINUOUS        ## Fire repeatedly, stop based on condition
 }
 
 enum StopCondition {
-	SHOT_COUNT,       # Stop after X shots (burst)
-	DURATION,         # Stop after X seconds (channel/beam)
-	MANUAL            # Stop when manually cancelled
+	SHOT_COUNT,       ## Stop after X shots (burst)
+	DURATION,         ## Stop after X seconds (channel/beam)
+	MANUAL            ## Stop when manually cancelled
 }
 
 var owner: Object = null

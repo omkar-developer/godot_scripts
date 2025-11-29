@@ -2,18 +2,21 @@
 class_name ProjectileWeapon
 extends WeaponComponent
 
+## Defines how each projectile's base firing direction is calculated.
 enum DirectionMode {
-	TO_TARGET,
-	OWNER_FORWARD,
-	OWNER_ROTATION,
-	MOUSE_POSITION,
-	CUSTOM
+	TO_TARGET,        ## Aims directly at the selected target.[br]Requires a valid TargetingComponent.[br]Used for homing, snipers, smart bullets.
+	OWNER_FORWARD,    ## Fires in the owner's forward facing direction.[br]Used for standard guns, turrets, bullet-hell emitters.
+	OWNER_ROTATION,   ## Fires using the owner's exact global rotation.[br]Bypasses helper forward logic.[br]Useful for animation-driven emitters.
+	MOUSE_POSITION,   ## Aims at the current mouse position.[br]Used for player-controlled aiming.
+	CUSTOM            ## Fires in a manually supplied direction vector.[br]Used for scripted patterns and special attacks.
 }
 
+
+## Defines what happens when no valid target exists.
 enum NoTargetBehavior {
-	DONT_FIRE,
-	RANDOM_DIRECTION,
-	OWNER_FORWARD
+	DONT_FIRE,         ## Weapon refuses to fire with no target.[br]Used for precision and homing weapons.
+	RANDOM_DIRECTION, ## Fires in a completely random direction.[br]Used for chaos weapons and traps.
+	OWNER_FORWARD     ## Fires forward using owner facing direction.[br]Used for turrets, emitters, and area denial.
 }
 
 var projectile_scene: PackedScene = null
@@ -33,8 +36,8 @@ var projectile_collision_mask: int = 1
 var projectile_properties: Dictionary[String, Variant] = {}
 
 enum SpreadMode {
-	EVEN,      # Evenly distributed across cone
-	RANDOM     # Random within cone
+	EVEN,      ## Evenly distributed across cone
+	RANDOM     ## Random within cone
 }
 
 # Add these new properties after existing ones:
@@ -219,14 +222,18 @@ func _set_nested_property(entity: Node, property_path: String, value: Variant) -
 	for i in range(parts.size() - 1):
 		var part := parts[i]
 		if current.get(part) == null:
-			push_warning("ProjectileWeapon: Property path '%s' not found (stopped at '%s')" % [property_path, part])
+			push_warning(
+				"ProjectileWeapon: Property path '%s' not found (stopped at '%s')" % [property_path, part]
+				)
 			return
 		current = current.get(part)
 	
 	# Set the final property
 	var final_property := parts[-1]
 	if current.get(final_property) == null and not (current is Node and current.has_method("set")):
-		push_warning("ProjectileWeapon: Property '%s' not found on '%s'" % [final_property, current])
+		push_warning(
+			"ProjectileWeapon: Property '%s' not found on '%s'" % [final_property, current]
+			)
 		return
 	
 	current.set(final_property, value)

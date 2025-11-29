@@ -84,11 +84,11 @@ extends WeaponNode
 	get:
 		if projectile_weapon:
 			return projectile_weapon.projectile_properties if projectile_weapon.projectile_properties != null else projectile_properties
-		else:
-			if projectile_properties != null:
-				return projectile_properties
-			else:
-				return {}
+
+		if projectile_properties != null:
+			return projectile_properties
+
+		return {}
 
 
 @export var spread_mode: ProjectileWeapon.SpreadMode = ProjectileWeapon.SpreadMode.EVEN:
@@ -169,9 +169,7 @@ func _connect_signals() -> void:
 func _on_projectile_spawned(_projectile: Node, _target: Node) -> void:
 	projectile_spawned.emit(_projectile, _target)
 	# Override in subclasses for custom behavior
-	pass
 
 func _on_projectile_spawn_failed() -> void:
 	projectile_spawn_failed.emit()
 	# Override in subclasses for custom behavior
-	pass

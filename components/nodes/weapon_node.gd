@@ -3,11 +3,27 @@
 class_name WeaponNode
 extends Node2D
 
-## Weapon properties
+## =========================
+## CORE WEAPON PROPERTIES
+## =========================
+
+## Unique string ID used for referencing this weapon in upgrades, saves, AI logic, etc.
 @export var weapon_id: String = ""
+
+## If true, the weapon will automatically fire whenever its cooldown allows.[br]
+## Typical for enemies, turrets, and auto-weapons.
 @export var auto_fire: bool = true
+
+## Master enable/disable flag for this weapon. [br]
+## When false, the weapon will never fire even if triggered.
 @export var enabled: bool = true
 
+
+## =========================
+## DAMAGE CONFIGURATION
+## =========================
+
+## Logical damage type ID (used by DamageComponent for resistances, elements, armor, etc.)
 @export var damage_type: int = 0:
 	set(value):
 		damage_type = value
@@ -16,37 +32,114 @@ extends Node2D
 	get:
 		return damage_component.damage_type if damage_component else damage_type
 
+
+## =========================
+## SPAWN POSITIONING
+## =========================
+
+## Optional Node2D used as the exact spawn origin for projectiles. [br]
+## If null, the weapon owner position is used instead.
 @export var spawn_point: Node2D = null
+
+## Local offset applied to the spawn position.[br]
+## Used for muzzle offsets, side cannons, dual barrels, etc.
 @export var spawn_offset: Vector2 = Vector2.ZERO
 
+
+## =========================
+## CONTINUOUS FIRE SETTINGS
+## =========================
 @export_group("Continuous Fire")
+
+## Defines whether the weapon fires once (SINGLE) or repeatedly (CONTINUOUS).
 @export var fire_mode: WeaponComponent.FireMode = WeaponComponent.FireMode.SINGLE
+
+## Defines how a CONTINUOUS weapon stops firing:[br]
+## - SHOT_COUNT: after max_shots[br]
+## - DURATION: after max_duration[br]
+## - MANUAL: only on external cancel[br]
 @export var stop_condition: WeaponComponent.StopCondition = WeaponComponent.StopCondition.SHOT_COUNT
+
+## Time between individual shots inside a CONTINUOUS burst (NOT the cooldown).
 @export var fire_interval: float = 0.1
+
+## Maximum number of shots allowed in a SHOT_COUNT burst.
 @export var max_shots: int = 3
+
+## Maximum time (seconds) the weapon is allowed to fire in DURATION mode.
 @export var max_duration: float = 1.0
+
+## If true, the weapon fires immediately when a burst starts.[br]
+## If false, it waits for the first fire_interval before shooting.
 @export var fire_on_start: bool = true
+
+## If true, cooldown starts after the burst ends.[br]
+## If false, cooldown can run during the burst.
 @export var cooldown_after_stop: bool = true
 
-@export_group("Targeting")
-@export var use_global_targeting: bool = true
-@export var needs_targeting: bool = true  # Some weapons don't need targeting (e.g., random fire)
 
+## =========================
+## TARGETING SETTINGS
+## =========================
+@export_group("Targeting")
+
+## If true, this weapon uses the owner's global TargetingComponent.[br]
+## If false, the weapon expects its own tracking data.
+@export var use_global_targeting: bool = true
+
+## If true, the weapon refuses to fire unless a valid target exists.[br]
+## If false, free-fire weapons can shoot without enemies.[br]
+@export var needs_targeting: bool = true  # e.g. random sprays, traps, bullet walls
+
+
+## =========================
+## BASE STATS
+## =========================
 @export_group("Stats")
+
+## Base damage per hit before crits and scaling.
 @export var damage: Stat = Stat.new(10.0, true, 0.0, 10000.0)
+
+## How many attack cycles per second this weapon can attempt.
+## Final cooldown is derived from this.
 @export var fire_rate: Stat = Stat.new(1.0, true, 0.01, 100.0)
+
+## Speed applied to projectiles (only used by ProjectileWeapon).
 @export var projectile_speed: Stat = Stat.new(300.0, true, 0.0, 10000.0)
+
+## Maximum targeting distance for this weapon.
 @export var weapon_range: Stat = Stat.new(300.0, true, 0.0, 10000.0)
+
+## Chance (0–1) that an attack becomes a critical hit.
 @export var crit_chance: Stat = Stat.new(0.0, true, 0.0, 1.0)
+
+## Damage multiplier applied when a critical hit occurs.
 @export var crit_damage: Stat = Stat.new(1.5, true, 1.0, 10.0)
 
+
+## =========================
+## STAT SCALING MULTIPLIERS
+## =========================
 @export_subgroup("Scaling")
+
+## Multiplier applied to the base damage stat.
 @export var damage_scaling: Stat = Stat.new(1.0, true, 0.0, 2.0)
+
+## Multiplier applied to the fire rate stat.
 @export var fire_rate_scaling: Stat = Stat.new(1.0, true, 0.0, 2.0)
+
+## Multiplier applied to projectile speed.
 @export var projectile_speed_scaling: Stat = Stat.new(1.0, true, 0.0, 2.0)
+
+## Multiplier applied to weapon range.
 @export var range_scaling: Stat = Stat.new(1.0, true, 0.0, 2.0)
+
+## Multiplier applied to critical hit chance.
 @export var crit_chance_scaling: Stat = Stat.new(1.0, true, 0.0, 2.0)
+
+## Multiplier applied to critical hit damage.
 @export var crit_damage_scaling: Stat = Stat.new(1.0, true, 0.0, 2.0)
+
 
 ## Component references
 var damage_component: DamageComponent = null
