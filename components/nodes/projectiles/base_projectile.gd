@@ -85,8 +85,12 @@ func on_hit(target: Node) -> void:
 	# Try to apply damage
 	if damage_request:
 		var health_comp: HealthComponent = target.get("health_component") as HealthComponent
+		
 		if health_comp:
 			health_comp.process_damage(damage_request)
+		elif target.has_method("process_damage"):
+			# Fallback for lightweight targets without health component
+			target.process_damage(damage_request)
 	
 	# Spawn hit effect
 	if spawn_on_hit_scene:

@@ -24,12 +24,26 @@ func create_request() -> DamageRequest:
 	return request
 
 func apply_to(target: Object) -> DamageResult:
-	if not is_instance_valid(target) or not target.has_method("process_damage"):
+	if not is_instance_valid(target):
+		damage_failed.emit(target)
+		return null
+	
+	# Try to get health component
+	var health_comp: HealthComponent = target.get("health_component") as HealthComponent
+	
+	# If no health component, try direct method
+	if not health_comp and not target.has_method("process_damage"):
 		damage_failed.emit(target)
 		return null
 	
 	var request = create_request()
-	var result: DamageResult = target.process_damage(request)
+	var result: DamageResult = null
+	
+	# Use health component if available, otherwise direct method
+	if health_comp:
+		result = health_comp.process_damage(request)
+	else:
+		result = target.process_damage(request)
 	
 	if result:
 		damage_applied.emit(target, result)

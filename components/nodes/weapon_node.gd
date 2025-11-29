@@ -104,7 +104,7 @@ extends Node2D
 ## Final cooldown is derived from this.
 @export var fire_rate: Stat = Stat.new(1.0, true, 0.01, 100.0)
 
-## Speed applied to projectiles (only used by ProjectileWeapon).
+## Speed applied to projectiles.
 @export var projectile_speed: Stat = Stat.new(300.0, true, 0.0, 10000.0)
 
 ## Maximum targeting distance for this weapon.
@@ -342,7 +342,7 @@ func get_stat(stat_name: String) -> Stat:
 		if not stat_weapon_id.is_empty() and stat_weapon_id == weapon_id:
 			return get_stat(stat_name.substr(dot_index + 1))
 		return null
-		
+
 	match stat_name:
 		"damage":
 			return damage
