@@ -336,6 +336,13 @@ func get_cooldown_progress() -> float:
 
 ## Get stat by name (for buffs/upgrades)
 func get_stat(stat_name: String) -> Stat:
+	if stat_name.contains("."):
+		var dot_index := stat_name.find(".")
+		var stat_weapon_id = stat_name.substr(0, dot_index)
+		if not stat_weapon_id.is_empty() and stat_weapon_id == weapon_id:
+			return get_stat(stat_name.substr(dot_index + 1))
+		return null
+		
 	match stat_name:
 		"damage":
 			return damage

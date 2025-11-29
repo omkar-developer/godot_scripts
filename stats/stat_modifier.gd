@@ -90,26 +90,26 @@ func merge(mod: StatModifier) -> bool:
 	if mod == null:
 		return false
 		
-	if _type != mod._type or _stat_name != mod._stat_name:
+	if _type != mod.get_type() or _stat_name != mod.get_stat_name():
 		push_warning("Attempting to merge modifiers of different types or stats")
 		return false
 		
 	match merge_strategy:
 		MergeStrategy.ADD:
-			set_value(_value + mod._value)
+			set_value(_value + mod.get_value())
 		MergeStrategy.OVERRIDE:
-			set_value(mod._value)
+			set_value(mod.get_value())
 		MergeStrategy.MAX:
-			set_value(max(_value, mod._value))
+			set_value(max(_value, mod.get_value()))
 		MergeStrategy.MIN:
-			set_value(min(_value, mod._value))
+			set_value(min(_value, mod.get_value()))
 	return true
 
 ## Checks if another modifier is equivalent to this one (same type and stat name).
 ## [param mod]: The modifier to compare.
 ## [return]: True if the modifiers are equal, false otherwise.
 func is_equal(mod: StatModifier) -> bool:
-	return _type == mod._type and _stat_name == mod._stat_name
+	return get_type() == mod.get_type() and get_stat_name() == mod.get_stat_name()
 
 ## Checks if the modifier is valid (i.e., linked to a stat).
 ## [return]: True if the modifier has a valid stat reference, false otherwise.
@@ -280,7 +280,7 @@ func _to_string() -> String:
 ## [param other]: The other modifier to interpolate with.[br]
 ## [param t]: The lerp t value.
 func interpolate(other: StatModifier, t: float) -> void:
-	set_value(lerp(_value, other._value, t))
+	set_value(lerp(_value, other.get_value(), t))
 
 ## Returns a duplicate copy of this modifier.
 func copy() -> StatModifier:

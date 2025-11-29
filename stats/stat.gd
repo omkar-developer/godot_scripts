@@ -318,7 +318,15 @@ func on_value_changed() -> void:
 ## [param _percent_modifier]: Initial percent modifier (default: 0.0).[br]
 ## [param _max_percent_modifier]: Initial max percent modifier (default: 0.0).[br]
 ## [param _max_flat_modifier]: Initial max flat modifier (default: 0.0).
-func _init(_base_value = 0.0, _base_value_clamped = false, _min_value = 0.0, _max_value = 100.0, _final_value_clamped = false, _flat_modifier = 0.0, _percent_modifier = 0.0, _max_percent_modifier = 0.0, _max_flat_modifier = 0.0) -> void:
+func _init(_base_value = 0.0, 
+	_base_value_clamped = false,
+ 	_min_value = 0.0,
+  	_max_value = 100.0,
+   	_final_value_clamped = false, 
+   	_flat_modifier = 0.0, 
+   	_percent_modifier = 0.0, 
+   	_max_percent_modifier = 0.0,
+    _max_flat_modifier = 0.0) -> void:
 	_enable_signal = false
 	self.max_value = _max_value
 	self.min_value = _min_value
@@ -385,18 +393,18 @@ func is_max() -> bool:
 	if stat_type == StatType.FLOAT:
 		# Use epsilon comparison for floating point values
 		return abs(get_value() - get_max()) < EPSILON  # Adjust epsilon as needed
-	else:
-		# For INT and BOOL, direct comparison is fine
-		return get_value() == get_max()
+	
+	# For INT and BOOL, direct comparison is fine
+	return get_value() == get_max()
 
 ## Returns true if the value is at the minimum value, false otherwise.
 func is_min() -> bool:
 	if stat_type == StatType.FLOAT:
 		# Use epsilon comparison for floating point values 
 		return abs(get_value() - min_value) < EPSILON  # Adjust epsilon as needed
-	else:
-		# For INT and BOOL, direct comparison is fine
-		return get_value() == min_value
+
+	# For INT and BOOL, direct comparison is fine
+	return get_value() == min_value
 
 ## Sets the base value directly without any modifiers or calculations.
 func set_direct_value(amount: float) -> float:
