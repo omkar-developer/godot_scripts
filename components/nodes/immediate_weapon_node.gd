@@ -91,11 +91,7 @@ func _spawn_visual_effect(target: Node) -> void:
 		effect.source = self
 	
 	# Add to scene
-	var parent = get_parent()
-	if parent:
-		parent.add_child(effect)
-	else:
-		get_tree().root.add_child(effect)
+	get_tree().root.add_child(effect)
 	
 	visual_effect_spawned.emit(effect)
 

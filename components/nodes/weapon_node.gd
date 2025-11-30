@@ -91,6 +91,17 @@ extends Node2D
 ## If false, free-fire weapons can shoot without enemies.[br]
 @export var needs_targeting: bool = true  # e.g. random sprays, traps, bullet walls
 
+@export_flags_2d_physics var target_collision_layer: int = 1 << 3: ## does not work on child/global targeting area
+	set(v):
+		target_collision_layer = v
+		if local_targeting_area:
+			local_targeting_area.collision_layer = v
+			
+@export_flags_2d_physics var target_collision_mask: int = 2: ## does not work on child/global targeting area
+	set(v):
+		target_collision_mask = v
+		if local_targeting_area:
+			local_targeting_area.collision_mask = v
 
 ## =========================
 ## BASE STATS
@@ -143,12 +154,8 @@ extends Node2D
 
 ## Component references
 var damage_component: DamageComponent = null
-var targeting_component: TargetingComponent = null
-var local_targeting_component: TargetingComponent = null
-
-## Local targeting area (if not using global)
-var targeting_area: Area2D = null
-var targeting_shape: CollisionShape2D = null
+var targeting_area: TargetingArea = null
+var local_targeting_area: TargetingArea = null
 
 ## Parent stats (from WeaponManager)
 var parent_damage: Stat
@@ -216,32 +223,26 @@ func _setup_targeting() -> void:
 	if use_global_targeting or not needs_targeting:
 		return
 	
-	# Try to find existing targeting area in children
-	targeting_area = get_node_or_null("TargetingArea")
+	# Try to find existing TargetingArea in children
+	local_targeting_area = get_node_or_null("TargetingArea")
 	
-	if not targeting_area:
-		# Create targeting area programmatically
-		targeting_area = Area2D.new()
-		targeting_area.name = "TargetingArea"
-		add_child(targeting_area)
+	if not local_targeting_area:
+		# Create TargetingArea programmatically
+		local_targeting_area = TargetingArea.new()
+		local_targeting_area.name = "TargetingArea"
+		local_targeting_area.collision_layer = target_collision_layer
+		local_targeting_area.collision_mask = target_collision_mask
+		add_child(local_targeting_area)
 		
-		targeting_shape = CollisionShape2D.new()
+		# Create collision shape
+		var targeting_shape = CollisionShape2D.new()
 		var circle = CircleShape2D.new()
 		circle.radius = final_range.get_value()
 		targeting_shape.shape = circle
-		targeting_area.add_child(targeting_shape)
-	else:
-		# Find existing shape
-		targeting_shape = targeting_area.get_node_or_null("CollisionShape2D")
-		if not targeting_shape:
-			for child in targeting_area.get_children():
-				if child is CollisionShape2D:
-					targeting_shape = child
-					break
+		local_targeting_area.add_child(targeting_shape)
 	
-	# Create local targeting component
-	local_targeting_component = TargetingComponent.new(self, targeting_area)
-	local_targeting_component.detection_range = final_range.get_value()
+	# Configure targeting
+	local_targeting_area.detection_range = final_range.get_value()
 
 func _setup_weapon_component() -> void:
 	# Override in subclasses to create specific weapon component
@@ -267,12 +268,8 @@ func _bind_stats_to_components() -> void:
 		final_fire_rate.bind_to_property(weapon_component, "base_fire_rate")
 	
 	# Bind to local targeting component (if exists)
-	if local_targeting_component:
-		final_range.bind_to_property(local_targeting_component, "detection_range")
-		
-		# Also bind to collision shape radius
-		if targeting_shape and targeting_shape.shape is CircleShape2D:
-			final_range.bind_to_property(targeting_shape.shape, "radius")
+	if local_targeting_area:
+		final_range.bind_to_property(local_targeting_area, "detection_range")
 	
 	# Bind continuous fire settings
 	if weapon_component:
@@ -297,9 +294,9 @@ func _on_cooldown_ready() -> void:
 	# Override in subclasses if needed
 	pass
 
-func set_components(_damage: DamageComponent, _targeting: TargetingComponent) -> void:
+func set_components(_damage: DamageComponent, _targeting: TargetingArea) -> void:
 	damage_component = _damage
-	targeting_component = _targeting
+	targeting_area = _targeting
 
 func _process(delta: float) -> void:
 	if Engine.is_editor_hint():
@@ -309,8 +306,8 @@ func _process(delta: float) -> void:
 		return
 	
 	# Update local targeting if we have it
-	if local_targeting_component:
-		local_targeting_component.update(delta)
+	if local_targeting_area:
+		local_targeting_area.update(delta)
 	
 	weapon_component.update(delta)
 
@@ -320,8 +317,8 @@ func fire() -> bool:
 	
 	return weapon_component.fire()
 
-func get_targeting() -> TargetingComponent:
-	return local_targeting_component if not use_global_targeting else targeting_component
+func get_targeting() -> TargetingArea:
+	return local_targeting_area if not use_global_targeting else targeting_area
 
 func get_spawn_position() -> Vector2:
 	if spawn_point and is_instance_valid(spawn_point):
@@ -329,7 +326,18 @@ func get_spawn_position() -> Vector2:
 	return global_position + spawn_offset.rotated(global_rotation)
 
 func can_fire() -> bool:
-	return weapon_component.can_fire() if weapon_component else false
+	if not enabled or not weapon_component:
+		return false
+	
+	# Allow firing if targeting not needed OR if we have valid targeting
+	if not needs_targeting:
+		return weapon_component.can_fire()
+	
+	var target_sys = get_targeting()
+	if not target_sys:
+		return false  # Needs targeting but doesn't have it
+	
+	return weapon_component.can_fire()
 
 func get_cooldown_progress() -> float:
 	return weapon_component.get_cooldown_progress() if weapon_component else 0.0

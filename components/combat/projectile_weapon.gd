@@ -21,7 +21,7 @@ enum NoTargetBehavior {
 
 var projectile_scene: PackedScene = null
 var damage_component: DamageComponent = null
-var targeting_component: TargetingComponent = null
+var targeting_area: TargetingArea = null
 var projectiles_per_shot: int = 1
 var spread_angle: float = 0.0
 var spawn_offset: Vector2 = Vector2.ZERO
@@ -52,7 +52,7 @@ func _init(
 	_owner: Object,
 	_projectile_scene: PackedScene,
 	_damage_component: DamageComponent,
-	_targeting_component: TargetingComponent = null,
+	_targeting_area: TargetingArea = null,
 	_base_fire_rate: float = 1.0,
 	_attack_speed: float = 0.0,
 	_attack_speed_scaling: float = 1.0
@@ -61,7 +61,7 @@ func _init(
 	
 	projectile_scene = _projectile_scene
 	damage_component = _damage_component
-	targeting_component = _targeting_component
+	targeting_area = _targeting_area
 
 func can_fire() -> bool:
 	if not super.can_fire():
@@ -69,7 +69,7 @@ func can_fire() -> bool:
 	
 	# Check no-target behavior
 	if no_target_behavior == NoTargetBehavior.DONT_FIRE:
-		var has_target = targeting_component and targeting_component.get_best_target() != null
+		var has_target = targeting_area and targeting_area.get_best_target() != null
 		if not has_target:
 			return false
 	
@@ -121,14 +121,14 @@ func _get_spawn_parent() -> Node:
 	return null
 
 func _get_projectile_target(index: int) -> Node:
-	if not targeting_component:
+	if not targeting_area:
 		return null
 	
 	# Single projectile - get best target
 	if projectiles_per_shot == 1:
-		return targeting_component.get_best_target()
+		return targeting_area.get_best_target()
 	
-	var targets = targeting_component.get_best_targets()
+	var targets = targeting_area.get_best_targets()
 	if targets.is_empty():
 		return null
 	

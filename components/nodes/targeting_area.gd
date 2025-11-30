@@ -1,5 +1,5 @@
-class_name TargetingComponent
-extends RefCounted
+class_name TargetingArea
+extends Area2D
 
 ## Target selection and tracking component for Area2D-based detection.[br]
 ##[br]
@@ -43,41 +43,36 @@ enum ShapeType {
 	CUSTOM       ## Custom shape (manual scaling)
 }
 
-## Reference to the entity that owns this component (can be any Object)
-var owner: Object = null
+@export_group("Targeting Settings")
+@export var target_priority: Priority = Priority.CLOSEST
+@export var update_mode: UpdateMode = UpdateMode.ON_TARGET_LOST
+@export var target_count: int = 1
+@export var detection_range: float = 100.0:
+	set(value):
+		var old_range = detection_range
+		detection_range = value
+		if auto_update_shape:
+			_update_collision_shape(detection_range)
+		range_changed.emit(detection_range * range_multiplier, old_range * range_multiplier)
 
-## Area2D used for target detection (connects to body/area entered/exited signals)
-var detection_area: Area2D = null
+@export_group("Detection")
+@export var detect_bodies: bool = true
+@export var detect_areas: bool = true
+@export var max_targets: int = 0
 
-## Current targeting priority mode
-var priority: Priority = Priority.CLOSEST
+@export_group("Update Settings")
+@export var auto_refresh_interval: float = 0.5
+@export var auto_cleanup: bool = true
 
-## Update mode for automatic target recalculation
-var update_mode: UpdateMode = UpdateMode.ON_TARGET_LOST
-
-## Number of targets to track (1 = single target, >1 = multiple targets)
-var target_count: int = 1
+@export_group("Shape Settings")
+@export var auto_update_shape: bool = true
+@export var range_multiplier: float = 1.0
 
 ## List of currently valid targets in detection range
 var valid_targets: Array[Node2D] = []
 
 ## Tracked best targets (size determined by target_count)
 var tracked_targets: Array[Node2D] = []
-
-## Whether to automatically remove invalid targets when getting best target
-var auto_cleanup: bool = true
-
-## Maximum number of targets to detect (0 = unlimited, applies to valid_targets)
-var max_targets: int = 0
-
-## Auto-refresh interval for AUTO update mode (in seconds)
-var auto_refresh_interval: float = 0.5
-
-## Whether to detect bodies (CharacterBody2D, RigidBody2D, etc.)
-var detect_bodies: bool = true
-
-## Whether to detect areas (Area2D)
-var detect_areas: bool = true
 
 ## Custom filter/priority function for target validation and selection.[br]
 ## When priority = CUSTOM: func(targets: Array[Node2D]) -> Node2D (returns best target).[br]
@@ -87,23 +82,8 @@ var target_filter: Callable = Callable()
 ## Internal timer for AUTO update mode
 var _refresh_timer: float = 0.0
 
-## Current range value (affects shape size)
-var detection_range: float = 100.0:
-	set(value):
-		var old_range = detection_range
-		detection_range = value
-		if auto_update_shape:
-			_update_collision_shape(detection_range)
-		range_changed.emit(detection_range * range_multiplier, old_range * range_multiplier)
-
 ## Reference to the detection shape
 var collision_shape: CollisionShape2D = null
-
-## Multiplier applied to range value
-var range_multiplier: float = 1.0
-
-## Whether to automatically update shape when range changes
-var auto_update_shape: bool = true
 
 ## Type of shape being used
 var shape_type: ShapeType = ShapeType.CUSTOM
@@ -132,20 +112,20 @@ var _can_use_single_fast_path: bool = false
 var _can_use_multi_first_seen_fast_path: bool = false
 var _can_use_multi_random_fast_path: bool = false
 
-## Constructor.[br]
-## [param _owner]: The Object that owns this component (can be RefCounted).[br]
-## [param _area]: Optional Area2D for detection (auto-detects if null).[br]
-## [param _priority]: Initial targeting priority mode.
-func _init(_owner: Object, _area: Area2D = null, _priority: Priority = Priority.CLOSEST) -> void:
-	owner = _owner
-	priority = _priority
-	_update_fast_path_flags()
-	
-	if _area:
-		set_detection_area(_area)
-	else:
-		_auto_detect_area()
+## Initialize component
+func _enter_tree() -> void:
+	if detect_bodies:
+		body_entered.connect(_on_body_entered)
+		body_exited.connect(_on_body_exited)
+	if detect_areas:
+		area_entered.connect(_on_area_entered)
+		area_exited.connect(_on_area_exited)
 
+## Initialize component
+func _ready() -> void:
+	_update_fast_path_flags()
+	_detect_collision_shape()
+	_scan_existing_targets()
 
 ## Internal: Update fast-path optimization flags based on current settings
 func _update_fast_path_flags() -> void:
@@ -154,82 +134,25 @@ func _update_fast_path_flags() -> void:
 	_can_use_single_fast_path = (
 		target_count == 1 and 
 		no_filter and 
-		priority in [Priority.FIRST_SEEN, Priority.LAST_SEEN, Priority.RANDOM]
+		target_priority in [Priority.FIRST_SEEN, Priority.LAST_SEEN, Priority.RANDOM]
 	)
 	
 	_can_use_multi_first_seen_fast_path = (
 		target_count > 1 and 
-		priority == Priority.FIRST_SEEN and 
+		target_priority == Priority.FIRST_SEEN and 
 		no_filter
 	)
 	
 	_can_use_multi_random_fast_path = (
 		target_count > 1 and 
-		priority == Priority.RANDOM and 
+		target_priority == Priority.RANDOM and 
 		no_filter
 	)
 
 
-## Internal: Try to auto-detect Area2D from owner.
-func _auto_detect_area() -> void:
-	if not owner is Node:
-		return
-	
-	var owner_node = owner as Node
-	
-	# Check if owner itself is Area2D
-	if owner_node is Area2D:
-		set_detection_area(owner_node)
-		return
-	
-	# Check if owner has Area2D child
-	for child in owner_node.get_children():
-		if child is Area2D:
-			set_detection_area(child)
-			return
-	
-	# Check if owner's parent is Area2D
-	var parent = owner_node.get_parent()
-	if parent and parent is Area2D:
-		set_detection_area(parent)
-
-
-## Set or change the detection area.[br]
-## Automatically disconnects from previous area and connects to new one.[br]
-## [param area]: The Area2D to use for detection.
-func set_detection_area(area: Area2D) -> void:
-	# Disconnect from old area
-	if detection_area and is_instance_valid(detection_area):
-		if detect_bodies and detection_area.body_entered.is_connected(_on_body_entered):
-			detection_area.body_entered.disconnect(_on_body_entered)
-			detection_area.body_exited.disconnect(_on_body_exited)
-		if detect_areas and detection_area.area_entered.is_connected(_on_area_entered):
-			detection_area.area_entered.disconnect(_on_area_entered)
-			detection_area.area_exited.disconnect(_on_area_exited)
-	
-	detection_area = area
-	
-	# Connect to new area
-	if detection_area:
-		if detect_bodies:
-			detection_area.body_entered.connect(_on_body_entered)
-			detection_area.body_exited.connect(_on_body_exited)
-		if detect_areas:
-			detection_area.area_entered.connect(_on_area_entered)
-			detection_area.area_exited.connect(_on_area_exited)
-		
-		# Scan for existing targets in area
-		_scan_existing_targets()
-
-	_detect_collision_shape()
-
-
 ## Detect and configure collision shape
-func _detect_collision_shape() -> void:
-	if not detection_area:
-		return
-	
-	for child in detection_area.get_children():
+func _detect_collision_shape() -> void:	
+	for child in get_children():
 		if child is CollisionShape2D:
 			collision_shape = child
 			break
@@ -376,7 +299,7 @@ func add_target(target: Node2D) -> bool:
 		return false
 	
 	# Check custom filter (only for non-CUSTOM priority)
-	if priority != Priority.CUSTOM and target_filter.is_valid():
+	if target_priority != Priority.CUSTOM and target_filter.is_valid():
 		if not target_filter.call(target):
 			return false
 	
@@ -473,7 +396,7 @@ func set_target_filter(filter_func: Callable, revalidate_existing: bool = false)
 	target_filter = filter_func
 	_update_fast_path_flags()
 	
-	if revalidate_existing and target_filter.is_valid() and priority != Priority.CUSTOM:
+	if revalidate_existing and target_filter.is_valid() and target_priority != Priority.CUSTOM:
 		var to_remove: Array[Node2D] = []
 		for target in valid_targets:
 			if not target_filter.call(target):
@@ -491,9 +414,9 @@ func clear_target_filter() -> void:
 
 ## Change targeting priority mode.[br]
 ## [param new_priority]: New Priority enum value.
-func set_priority(new_priority: Priority) -> void:
-	if priority != new_priority:
-		priority = new_priority
+func set_target_priority(new_priority: Priority) -> void:
+	if target_priority != new_priority:
+		target_priority = new_priority
 		_update_fast_path_flags()
 
 
@@ -574,7 +497,7 @@ func _targets_differ(old: Array[Node2D], new: Array[Node2D]) -> bool:
 
 ## Internal: Get single best target based on priority.
 func _get_single_best_target() -> Node2D:
-	match priority:
+	match target_priority:
 		Priority.CLOSEST:
 			return _get_closest_target()
 		Priority.FARTHEST:
@@ -604,7 +527,7 @@ func _get_multiple_best_targets() -> Array[Node2D]:
 	var sorted_targets: Array[Node2D] = valid_targets.duplicate()
 	
 	# Sort based on priority
-	match priority:
+	match target_priority:
 		Priority.CLOSEST:
 			sorted_targets = _sort_by_distance(sorted_targets, true)
 		Priority.FARTHEST:
@@ -660,7 +583,7 @@ func _handle_target_entered(target: Node2D) -> void:
 		return
 	
 	# Check custom filter (only for non-CUSTOM priority)
-	if priority != Priority.CUSTOM and target_filter.is_valid():
+	if target_priority != Priority.CUSTOM and target_filter.is_valid():
 		if not target_filter.call(target):
 			return
 	
@@ -724,26 +647,19 @@ func _handle_target_exited(target: Node2D) -> void:
 
 ## Internal: Scan for targets already in detection area (called when area changes).
 func _scan_existing_targets() -> void:
-	if not detection_area:
-		return
-	
 	if detect_bodies:
-		var bodies = detection_area.get_overlapping_bodies()
+		var bodies = get_overlapping_bodies()
 		for body in bodies:
 			_handle_target_entered(body)
 	
 	if detect_areas:
-		var areas = detection_area.get_overlapping_areas()
+		var areas = get_overlapping_areas()
 		for area in areas:
 			_handle_target_entered(area)
 
 
 ## Internal: Find closest target by distance.
 func _get_closest_target() -> Node2D:
-	if not owner is Node2D:
-		return valid_targets[0] if not valid_targets.is_empty() else null
-	
-	var owner_node = owner as Node2D  # Changed to Node2D
 	var closest: Node2D = null
 	var min_dist = INF
 	
@@ -752,7 +668,7 @@ func _get_closest_target() -> Node2D:
 			continue
 		
 		var target_node = target as Node2D
-		var dist = owner_node.global_position.distance_squared_to(target_node.global_position)
+		var dist = global_position.distance_squared_to(target_node.global_position)
 		if dist < min_dist:
 			min_dist = dist
 			closest = target_node
@@ -761,10 +677,6 @@ func _get_closest_target() -> Node2D:
 
 ## Internal: Find farthest target by distance.
 func _get_farthest_target() -> Node2D:
-	if not owner is Node2D:
-		return valid_targets[-1] if not valid_targets.is_empty() else null
-	
-	var owner_node = owner as Node2D
 	var farthest: Node2D = null
 	var max_dist = -INF
 	
@@ -772,7 +684,7 @@ func _get_farthest_target() -> Node2D:
 		if not is_instance_valid(target):
 			continue
 		
-		var dist = owner_node.global_position.distance_squared_to(target.global_position)
+		var dist = global_position.distance_squared_to(target.global_position)
 		if dist > max_dist:
 			max_dist = dist
 			farthest = target
@@ -822,13 +734,9 @@ func _get_highest_hp_target() -> Node2D:
 
 ## Internal: Sort targets by distance.
 func _sort_by_distance(targets: Array[Node2D], ascending: bool) -> Array[Node2D]:
-	if not owner is Node2D:
-		return targets
-	
-	var owner_node = owner as Node2D
 	targets.sort_custom(func(a, b):
-		var dist_a = owner_node.global_position.distance_squared_to(a.global_position)
-		var dist_b = owner_node.global_position.distance_squared_to(b.global_position)
+		var dist_a = global_position.distance_squared_to(a.global_position)
+		var dist_b = global_position.distance_squared_to(b.global_position)
 		return dist_a < dist_b if ascending else dist_a > dist_b
 	)
 	return targets
@@ -904,7 +812,7 @@ func _fast_path_single_target_entered(target: Node2D) -> void:
 
 	var old_tracked = tracked_targets.duplicate()
 	
-	match priority:
+	match target_priority:
 		Priority.FIRST_SEEN:
 			# Track first target and never switch until it exits
 			if tracked_targets.is_empty():
@@ -935,7 +843,7 @@ func _fast_path_single_target_exited(target: Node2D) -> void:
 	
 	# If the exited target was being tracked, update tracked targets
 	if tracked_targets.size() == 1 and tracked_targets[0] == target:
-		match priority:
+		match target_priority:
 			Priority.FIRST_SEEN:
 				# Take the next first target (if any)
 				tracked_targets = [valid_targets[0]] if not valid_targets.is_empty() else []
@@ -961,7 +869,7 @@ func _fast_path_get_single_target() -> Array[Node2D]:
 	if valid_targets.is_empty():
 		return []
 	
-	match priority:
+	match target_priority:
 		Priority.FIRST_SEEN:
 			return [valid_targets[0]]
 		Priority.LAST_SEEN:

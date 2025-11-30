@@ -499,12 +499,11 @@ func _get_closest_item() -> Node:
 func _get_item_type(item: Node) -> String:
 	if "item_type" in item:
 		return item.get("item_type")
-	elif item.has_meta("item_type"):
+	if item.has_meta("item_type"):
 		return item.get_meta("item_type")
-	elif "type" in item:
+	if "type" in item:
 		return item.get("type")
-	else:
-		return item.name
+	return item.name
 
 
 ## Internal: Destroy collected item

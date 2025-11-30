@@ -28,7 +28,7 @@ extends Node2D
 ## =========================
 
 var damage_component: DamageComponent = null
-var targeting_component: TargetingComponent = null
+var targeting_area: TargetingArea = null
 
 
 ## =========================
@@ -42,8 +42,7 @@ func _enter_tree() -> void:
 	_override_stats_from_parent()
 	_get_components_from_parent()
 	_pass_components_to_weapons()
-
-
+	
 ## =========================
 ## STAT OVERRIDE (RUNTIME ONLY)
 ## =========================
@@ -96,14 +95,13 @@ func _get_components_from_parent() -> void:
 	if not parent:
 		return
 
+	targeting_area = parent.get("targeting_area") as TargetingArea
 	damage_component = parent.get("damage_component") as DamageComponent
-	targeting_component = parent.get("targeting_component") as TargetingComponent
-
 
 func _pass_components_to_weapons() -> void:
 	for child in get_children():
 		if child is WeaponNode:
-			child.set_components(damage_component, targeting_component)
+			child.set_components(damage_component, targeting_area)
 
 
 ## =========================
@@ -116,7 +114,7 @@ func add_weapon(weapon: WeaponNode) -> void:
 		return
 
 	add_child(weapon)
-	weapon.set_components(damage_component, targeting_component)
+	weapon.set_components(damage_component, targeting_area)
 
 
 func remove_weapon(weapon: WeaponNode) -> void:
@@ -222,7 +220,7 @@ func get_stat(stat_name: String) -> Stat:
 ## MANUAL COMPONENT OVERRIDE
 ## =========================
 
-func set_components(_damage_component: DamageComponent, _targeting_component: TargetingComponent) -> void:
+func set_components(_damage_component: DamageComponent, _targeting_component: TargetingArea) -> void:
 	damage_component = _damage_component
-	targeting_component = _targeting_component
+	targeting_area = _targeting_component
 	_pass_components_to_weapons()

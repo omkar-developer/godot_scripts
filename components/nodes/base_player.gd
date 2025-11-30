@@ -61,13 +61,25 @@ extends BaseEntity
 	get:
 		return targeting_range_stat.get_value() if targeting_range_stat else targeting_range
 
+@export_flags_2d_physics var target_collision_layer: int = 1 << 3: ## does not work on child/global targeting area
+	set(v):
+		target_collision_layer = v
+		if targeting_area:
+			targeting_area.collision_layer = v
+			
+@export_flags_2d_physics var target_collision_mask: int = 2: ## does not work on child/global targeting area
+	set(v):
+		target_collision_mask = v
+		if targeting_area:
+			targeting_area.collision_mask = v
+
 #endregion
 
 #region Component References - Player-Specific
 
 var controller: PlayerController
 var collection_component: CollectionComponent
-var targeting_component: TargetingComponent
+var targeting_area: TargetingArea
 
 ## Stats for dynamic gameplay values that can be buffed/debuffed
 var health_stat: Stat
@@ -78,11 +90,9 @@ var targeting_range_stat: Stat
 ## Detection areas (created in scene or code)
 var collection_detection_area: Area2D = null
 var collection_area: Area2D = null
-var targeting_area: Area2D = null
 
 ## Collision shapes for dynamic resizing
 var collection_shape: CollisionShape2D = null
-var targeting_shape: CollisionShape2D = null
 
 ## UI References (optional - can be bound externally)
 var health_bar: Range = null
@@ -195,47 +205,36 @@ func _bind_collection_stats() -> void:
 	magnetic_strength_stat.bind_to_property(collection_component, "magnetic_strength")
 
 
-# New: targeting setup and bindings
 func _setup_targeting() -> void:
-	# Try to find targeting area in children
-	targeting_area = get_node_or_null("TargetingArea")
+	# Try to find TargetingArea in children
+	targeting_area = get_node_or_null("TargetingArea") as TargetingArea
 	
 	if not targeting_area:
-		# Create targeting area programmatically
-		targeting_area = Area2D.new()
+		# Create TargetingArea programmatically
+		targeting_area = TargetingArea.new()
 		targeting_area.name = "TargetingArea"
+		targeting_area.collision_layer = target_collision_layer
+		targeting_area.collision_mask = target_collision_mask
 		add_child(targeting_area)
 		
-		targeting_shape = CollisionShape2D.new()
+		# Create collision shape for it
+		var targeting_shape = CollisionShape2D.new()
 		var circle = CircleShape2D.new()
 		circle.radius = targeting_range_stat.get_value()
 		targeting_shape.shape = circle
 		targeting_area.add_child(targeting_shape)
-	else:
-		# Find existing shape
-		targeting_shape = targeting_area.get_node_or_null("CollisionShape2D")
-		if not targeting_shape:
-			for child in targeting_area.get_children():
-				if child is CollisionShape2D:
-					targeting_shape = child
-					break
 	
-	# Create targeting component with temp variable to avoid getter loopback
-	var _targeting_component = TargetingComponent.new(self, targeting_area)
-	_targeting_component.detection_range = targeting_range_stat.get_value()
-	targeting_component = _targeting_component
+	# Configure targeting component
+	targeting_area.detection_range = targeting_range_stat.get_value()
 	
-	# Bind targeting range stat to component and collision shape
+	# Bind targeting range stat to component
 	_bind_targeting_stats()
 
 
 func _bind_targeting_stats() -> void:
 	# Bind targeting range stat to component's detection_range
-	targeting_range_stat.bind_to_property(targeting_component, "detection_range")
-	
-	# Bind targeting range stat to the Area2D collision shape radius
-	if targeting_shape and targeting_shape.shape is CircleShape2D:
-		targeting_range_stat.bind_to_property(targeting_shape.shape, "radius")
+	if targeting_area:
+		targeting_range_stat.bind_to_property(targeting_area, "detection_range")
 
 
 func _setup_ui_bindings() -> void:
@@ -258,10 +257,7 @@ func _process(delta: float) -> void:
 		controller.update(delta)
 	
 	if collection_component:
-		collection_component.update(delta)
-	
-	if targeting_component:
-		targeting_component.update(delta)
+		collection_component.update(delta)	
 	
 	super._process(delta)
 
@@ -350,8 +346,8 @@ func get_nearest_collectible() -> Node:
 
 ## Get nearest enemy
 func get_nearest_enemy() -> Node:
-	if targeting_component:
-		return targeting_component.get_best_target()
+	if targeting_area:
+		return targeting_area.get_best_target()
 	return null
 
 
@@ -362,7 +358,7 @@ func get_detected_item_count() -> int:
 
 ## Get number of enemies in range
 func get_enemy_count() -> int:
-	return targeting_component.get_target_count() if targeting_component else 0
+	return targeting_area.get_target_count() if targeting_area else 0
 
 #endregion
 
