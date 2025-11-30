@@ -24,6 +24,8 @@ extends BaseEntity
 @export var collision_damage_enabled: bool = true
 @export var destroy_on_collision: bool = true
 @export var collision_cooldown: float = 0.0  ## Time between damage ticks (0 = instant death)
+@export var damage: float = 10.0
+@export var damage_type: int = 0
 
 @export_group("Target")
 @export var auto_find_player: bool = true
@@ -111,18 +113,21 @@ func _on_body_collision(body: Node2D) -> void:
 
 
 func _try_damage_node(node: Node) -> void:
-	# Try to get health component
-	var health_comp = node.get("health_component") as HealthComponent
-	
-	if health_comp and damage_component:
-		damage_component.apply_to(health_comp)
-		
+	if not damage_component:
+		return
+
+	var request: DamageRequest = damage_component.create_request(damage, damage_type, 0, 0, Vector2.ZERO)
+
+	var result: DamageResult = request.apply_to_target(node)
+
+	if result:
 		# Handle cooldown or instant death
 		if collision_cooldown > 0.0:
 			_can_damage = false
 			_collision_timer = collision_cooldown
 		elif destroy_on_collision:
 			_on_collision_destroy()
+
 
 #endregion
 

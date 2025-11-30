@@ -20,7 +20,7 @@ enum NoTargetBehavior {
 }
 
 var projectile_scene: PackedScene = null
-var damage_component: DamageComponent = null
+var damage_component: Object = null ## object with create request function
 var targeting_area: TargetingArea = null
 var projectiles_per_shot: int = 1
 var spread_angle: float = 0.0
@@ -47,11 +47,13 @@ var target_cycle_index: int = 0
 
 signal projectile_spawned(projectile: Node, target: Node)
 signal projectile_spawn_failed()
+signal damage_dealt(target: Node, result: DamageResult)
+signal damage_failed(target: Node)
 
 func _init(
 	_owner: Object,
 	_projectile_scene: PackedScene,
-	_damage_component: DamageComponent,
+	_damage_component: Object,
 	_targeting_area: TargetingArea = null,
 	_base_fire_rate: float = 1.0,
 	_attack_speed: float = 0.0,
@@ -107,8 +109,12 @@ func _spawn_projectile(index: int) -> void:
 	var direction = _calculate_projectile_direction(target, index)
 	
 	_setup_projectile(projectile, spawn_pos, direction, target)
+	projectile.connect("hit_target", Callable(self, "_on_hit_target"))
 	parent.add_child(projectile)
 	projectile_spawned.emit(projectile, target)
+
+func _on_hit_target(target: Node, result: DamageResult) -> void:
+	damage_dealt.emit(target, result)
 
 func _get_spawn_parent() -> Node:
 	if spawn_parent:
@@ -243,7 +249,7 @@ func _setup_projectile(projectile: Node, spawn_pos: Vector2, direction: Vector2,
 		projectile.global_position = spawn_pos
 	
 	if "damage_request" in projectile:
-		projectile.damage_request = damage_component.create_request()
+		projectile.damage_request = damage_component.create_damage_request()
 	
 	if "target" in projectile:
 		projectile.target = target

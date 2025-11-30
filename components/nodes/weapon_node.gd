@@ -24,14 +24,7 @@ extends Node2D
 ## =========================
 
 ## Logical damage type ID (used by DamageComponent for resistances, elements, armor, etc.)
-@export var damage_type: int = 0:
-	set(value):
-		damage_type = value
-		if damage_component:
-			damage_component.damage_type = value
-	get:
-		return damage_component.damage_type if damage_component else damage_type
-
+@export var damage_type: int = 0 ## TODO: does nothing
 
 ## =========================
 ## SPAWN POSITIONING
@@ -96,7 +89,7 @@ extends Node2D
 		target_collision_layer = v
 		if local_targeting_area:
 			local_targeting_area.collision_layer = v
-			
+
 @export_flags_2d_physics var target_collision_mask: int = 2: ## does not work on child/global targeting area
 	set(v):
 		target_collision_mask = v
@@ -180,7 +173,6 @@ signal fired()
 
 func _init() -> void:
 	damage_component = DamageComponent.new(self)
-	damage_component.damage_type = damage_type
 
 func _ready() -> void:
 	if Engine.is_editor_hint():
@@ -217,7 +209,6 @@ func _create_final_stats() -> void:
 func _setup_damage_component() -> void:
 	# Every weapon deals damage
 	damage_component = DamageComponent.new(self)
-	damage_component.damage_type = damage_type
 
 func _setup_targeting() -> void:
 	if use_global_targeting or not needs_targeting:
@@ -258,11 +249,6 @@ func _setup_weapon_component() -> void:
 	pass
 
 func _bind_stats_to_components() -> void:
-	# Bind final stats to DamageComponent
-	final_damage.bind_to_property(damage_component, "damage")
-	final_crit_chance.bind_to_property(damage_component, "crit_chance")
-	final_crit_damage.bind_to_property(damage_component, "crit_damage")
-	
 	# Bind to WeaponComponent (if created)
 	if weapon_component:
 		final_fire_rate.bind_to_property(weapon_component, "base_fire_rate")
@@ -412,3 +398,19 @@ func is_continuous_firing() -> bool:
 
 func get_continuous_fire_progress() -> float:
 	return weapon_component.get_continuous_fire_progress() if weapon_component else 0.0
+
+func create_damage_request() -> DamageRequest:
+	var dmg_comp := damage_component
+
+	var request := DamageRequest.new(
+		dmg_comp.get_owner() if dmg_comp else null,
+		dmg_comp,
+		final_damage.get_value(),
+		damage_type
+	)
+
+	request.crit_chance = final_crit_chance.get_value()
+	request.crit_damage = final_crit_damage.get_value()
+	request.knockback = Vector2.ZERO
+
+	return request

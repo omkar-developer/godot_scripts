@@ -45,14 +45,6 @@ extends Area2D
 		return health_component.invulnerable if health_component else invulnerable
 
 @export_group("Damage Settings")
-@export var base_damage: float = 10.0:
-	set(value):
-		base_damage = value
-		if damage_component:
-			damage_component.damage = value
-	get:
-		return damage_component.damage if damage_component else base_damage
-
 @export var damage_reduction: float = 0.0:
 	set(value):
 		damage_reduction = value
@@ -181,7 +173,6 @@ func _create_core_components() -> void:
 	
 	# Damage component (for dealing damage to others)
 	var _damage_component = DamageComponent.new(self)
-	_damage_component.damage = base_damage
 	damage_component = _damage_component
 	
 	_initialized = true
@@ -316,8 +307,8 @@ func _on_heal_received(_amount: float) -> void:
 func attack(target_health: HealthComponent) -> DamageResult:
 	if not damage_component:
 		return null
-	
-	return damage_component.apply_to(target_health)
+	# TODO: Add attack logic
+	return null
 
 
 ## Take damage from a source

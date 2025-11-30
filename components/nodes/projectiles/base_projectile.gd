@@ -30,10 +30,12 @@ var age: float = 0.0
 ## Whether to destroy on terrain hit
 @export var destroy_on_terrain: bool = true
 
+@export var spawn_node: Node = null
+
 ## Whether projectile is alive (runtime)
 var is_alive: bool = true
 
-signal hit_target(target: Node)
+signal hit_target(target: Node, result: DamageResult)
 signal hit_terrain(body: Node)
 signal projectile_destroyed()
 
@@ -82,21 +84,15 @@ func _on_spawned() -> void:
 
 ## Virtual method called when projectile hits a target
 func on_hit(target: Node) -> void:
-	# Try to apply damage
+	var result: DamageResult = null
+
 	if damage_request:
-		var health_comp: HealthComponent = target.get("health_component") as HealthComponent
-		
-		if health_comp:
-			health_comp.process_damage(damage_request)
-		elif target.has_method("process_damage"):
-			# Fallback for lightweight targets without health component
-			target.process_damage(damage_request)
-	
-	# Spawn hit effect
+		result = damage_request.apply_to_target(target)
+
 	if spawn_on_hit_scene:
 		_spawn_scene(spawn_on_hit_scene, global_position)
-	
-	hit_target.emit(target)
+
+	hit_target.emit(target, result)
 
 
 ## Virtual method called when projectile hits terrain
@@ -154,9 +150,9 @@ func _spawn_scene(scene: PackedScene, pos: Vector2) -> Node:
 		instance.damage_request = damage_request
 	
 	# Add to scene
-	var parent = get_parent()
-	if parent:
-		parent.add_child(instance)
+	# TODO: create spawner system
+	if is_instance_valid(spawn_node):
+		spawn_node.add_child(instance)
 	else:
 		get_tree().root.add_child(instance)
 	

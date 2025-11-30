@@ -242,11 +242,24 @@ func get_enemy_count() -> int:
 ## Get stat by name for buff/debuff system
 ## Valid stat names: "health", "range", "magnet"
 func get_stat(stat_name: String) -> Stat:
+	# 1. Try direct player stats first
 	match stat_name:
 		"health":
 			return health_stat
+		"targeting_range":
+			return targeting_range_stat
 		_:
-			push_error("BasePlayer: Unknown stat name '%s'" % stat_name)
-			return null
+			pass
+
+	# 2. Ask child nodes (CollectionArea, Dash, Aura, etc.)
+	for child in get_children():
+		var stat = Stat.get_stat(child, stat_name)
+		if stat:
+			return stat
+
+	# 3. Not found
+	push_warning("BasePlayer: Unknown stat name '%s'" % stat_name)
+	return null
+
 
 #endregion

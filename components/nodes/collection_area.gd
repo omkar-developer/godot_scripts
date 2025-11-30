@@ -231,7 +231,13 @@ func _apply_magnetic_pull(item: Node2D, target_pos: Vector2, delta: float) -> vo
 	
 	# Apply movement
 	var velocity = direction * pull_strength * delta
-	item.global_position += velocity.limit_length(magnetic_max_speed * delta)
+	if item is CharacterBody2D:
+		item.velocity = velocity.limit_length(magnetic_max_speed)
+	elif item is RigidBody2D:
+		item.apply_central_force(velocity)
+	else:
+		item.global_position += velocity.limit_length(magnetic_max_speed * delta)
+
 
 ## Update group-based collection (for screen-wide buffs)
 func _update_group_collection(delta: float) -> void:

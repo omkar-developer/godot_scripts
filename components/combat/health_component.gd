@@ -184,18 +184,18 @@ func heal(amount: float) -> float:
 		health_value_added.emit(amount)
 		# Actual healed will be calculated after stat updates current_health
 		return amount  # Return requested amount, actual will be in signal
-	else:
-		# Handle locally with clamping
-		current_health = clampf(current_health + amount, 0.0, max_health)
-		var actual_healed = current_health - old_health
+
+	# Handle locally with clamping
+	current_health = clampf(current_health + amount, 0.0, max_health)
+	var actual_healed = current_health - old_health
+	
+	if actual_healed > 0.0:
+		healed.emit(actual_healed)
 		
-		if actual_healed > 0.0:
-			healed.emit(actual_healed)
-			
-			if is_dead and current_health > 0.0:
-				is_dead = false
-		
-		return actual_healed
+		if is_dead and current_health > 0.0:
+			is_dead = false
+	
+	return actual_healed
 
 func restore_shield(amount: float) -> float:
 	if not shield_enabled or amount <= 0.0:
@@ -207,15 +207,15 @@ func restore_shield(amount: float) -> float:
 		# Let stat handle the change
 		shield_value_added.emit(amount)
 		return amount  # Return requested amount
-	else:
-		# Handle locally with clamping
-		current_shield = clampf(current_shield + amount, 0.0, max_shield)
-		var actual_restored = current_shield - old_shield
-		
-		if actual_restored > 0.0:
-			shield_restored.emit(actual_restored)
-		
-		return actual_restored
+
+	# Handle locally with clamping
+	current_shield = clampf(current_shield + amount, 0.0, max_shield)
+	var actual_restored = current_shield - old_shield
+	
+	if actual_restored > 0.0:
+		shield_restored.emit(actual_restored)
+	
+	return actual_restored
 
 func update(delta: float) -> void:
 	if iframe_enabled and iframe_timer > 0.0:

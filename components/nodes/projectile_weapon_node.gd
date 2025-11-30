@@ -126,7 +126,7 @@ func _setup_weapon_component() -> void:
 	var _projectile_weapon = ProjectileWeapon.new(
 		self,
 		projectile_scene,
-		damage_component,
+		self,
 		get_targeting(),
 		final_fire_rate.get_value()
 	)

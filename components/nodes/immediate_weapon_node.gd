@@ -27,7 +27,7 @@ func _setup_weapon_component() -> void:
 	# Create ImmediateWeapon component with temp pattern
 	var temp_immediate = ImmediateWeapon.new(
 		self,
-		damage_component,
+		self,
 		get_targeting(),
 		final_fire_rate.get_value()
 	)
