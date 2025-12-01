@@ -114,7 +114,8 @@ func _spawn_projectile(index: int) -> void:
 	projectile_spawned.emit(projectile, target)
 
 func _on_hit_target(target: Node, result: DamageResult) -> void:
-	damage_dealt.emit(target, result)
+	if result.was_blocked: damage_failed.emit(target)
+	else: damage_dealt.emit(target, result)
 
 func _get_spawn_parent() -> Node:
 	if spawn_parent:
