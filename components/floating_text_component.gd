@@ -18,12 +18,22 @@ enum AnimationStyle {
 	SCALE_POP        ## Pop/scale effect then fade
 }
 
-## Text alignment within the label
-enum TextAlign {
-	LEFT,
-	CENTER,
-	RIGHT
-}
+## Lightweight animation data structure (replaces Dictionary for performance)
+class AnimationData:
+	var label: Label
+	var style: AnimationStyle
+	var elapsed: float = 0.0
+	var start_pos: Vector2
+	var velocity: Vector2
+	var start_scale: Vector2
+	var needs_alpha_update: bool = true  # Optimization flag
+	
+	func _init(_label: Label, _style: AnimationStyle, _start_pos: Vector2, _velocity: Vector2, _start_scale: Vector2) -> void:
+		label = _label
+		style = _style
+		start_pos = _start_pos
+		velocity = _velocity
+		start_scale = _start_scale
 
 ## Reference to the owner node (usually the entity taking damage/healing)
 var owner: Node = null
@@ -76,8 +86,11 @@ var recycle_to_pool: bool = true
 ## Gravity effect for ARC animations
 var arc_gravity: float = 100.0
 
-## List of active floating labels being animated
-var _active_labels: Array[Dictionary] = []
+## List of active floating labels being animated (optimized with custom class)
+var _active_labels: Array[AnimationData] = []
+
+## Cached inverse duration (optimization: 1 division instead of N per frame)
+var _inv_duration: float = 1.0
 
 ## Emitted when a floating text finishes animating
 signal text_finished(label: Label)
@@ -90,6 +103,7 @@ func _init(_owner: Node, _spawn_parent: Node = null, _label_spawner: LabelSpawne
 	owner = _owner
 	spawn_parent = _spawn_parent if _spawn_parent else _owner
 	label_spawner = _label_spawner
+	_update_cached_values()
 
 
 ## Spawn floating text at a specific position.[br]
@@ -193,26 +207,26 @@ func spawn_status(message: String, color: Color = Color.YELLOW) -> Label:
 ## Update all active floating labels (call in _process).[br]
 ## [param delta]: Time elapsed since last frame.
 func update(delta: float) -> void:
-	var i = _active_labels.size() - 1
-	while i >= 0:
+	# Reverse iteration for safe removal
+	for i in range(_active_labels.size() - 1, -1, -1):
 		var data = _active_labels[i]
-		var label = data.label as Label
 		
-		if not is_instance_valid(label):
+		# Validity check
+		if not is_instance_valid(data.label):
 			_active_labels.remove_at(i)
-			i -= 1
 			continue
 		
+		# Update timer
 		data.elapsed += delta
-		var progress = data.elapsed / duration
+		var progress = data.elapsed * _inv_duration  # Optimized: use cached inverse
 		
+		# Check completion
 		if progress >= 1.0:
-			_finish_label(label, i)
-			i -= 1
+			_finish_label(data.label, i)
 			continue
 		
-		_update_animation(label, data, progress, delta)
-		i -= 1
+		# Update animation
+		_update_animation(data, progress, delta)
 
 
 ## Set label spawner for object pooling.[br]
@@ -225,6 +239,13 @@ func set_label_spawner(spawner: LabelSpawner) -> void:
 ## [return]: LabelSpawner instance or null.
 func get_label_spawner() -> LabelSpawner:
 	return label_spawner
+
+
+## Set animation duration and update cached values.[br]
+## [param new_duration]: New duration in seconds.
+func set_duration(new_duration: float) -> void:
+	duration = new_duration
+	_update_cached_values()
 
 
 ## Internal: Create label node with styling
@@ -256,30 +277,26 @@ func _create_label(text: String, color: Color) -> Label:
 
 ## Internal: Start animation for label
 func _start_animation(label: Label, style: AnimationStyle) -> void:
-	var data = {
-		"label": label,
-		"style": style,
-		"elapsed": 0.0,
-		"start_pos": label.position,
-		"velocity": Vector2(0, -float_speed),
-		"start_scale": label.scale
-	}
+	var velocity := Vector2(0, -float_speed)
 	
 	# Set initial velocity based on style
 	match style:
 		AnimationStyle.ARC_LEFT:
-			data.velocity = Vector2(-float_speed * 0.7, -float_speed)
+			velocity = Vector2(-float_speed * 0.7, -float_speed)
 		AnimationStyle.ARC_RIGHT:
-			data.velocity = Vector2(float_speed * 0.7, -float_speed)
+			velocity = Vector2(float_speed * 0.7, -float_speed)
 		AnimationStyle.BOUNCE:
-			data.velocity = Vector2(0, -float_speed * 1.5)
+			velocity = Vector2(0, -float_speed * 1.5)
 	
+	# Create optimized data structure
+	var data = AnimationData.new(label, style, label.position, velocity, label.scale)
 	_active_labels.append(data)
 
 
-## Internal: Update animation frame
-func _update_animation(label: Label, data: Dictionary, progress: float, delta: float) -> void:
-	var style = data.style as AnimationStyle
+## Internal: Update animation frame (optimized)
+func _update_animation(data: AnimationData, progress: float, delta: float) -> void:
+	var label = data.label
+	var style = data.style
 	
 	match style:
 		AnimationStyle.FLOAT_UP:
@@ -287,17 +304,20 @@ func _update_animation(label: Label, data: Dictionary, progress: float, delta: f
 		
 		AnimationStyle.FLOAT_UP_FADE:
 			label.position.y -= float_speed * delta
-			label.modulate.a = 1.0 - progress
+			if data.needs_alpha_update:
+				label.modulate.a = 1.0 - progress
 		
 		AnimationStyle.ARC_LEFT, AnimationStyle.ARC_RIGHT:
 			data.velocity.y += arc_gravity * delta
 			label.position += data.velocity * delta
-			label.modulate.a = 1.0 - progress
+			if data.needs_alpha_update:
+				label.modulate.a = 1.0 - progress
 		
 		AnimationStyle.BOUNCE:
 			data.velocity.y += arc_gravity * delta
 			label.position += data.velocity * delta
-			label.modulate.a = 1.0 - progress
+			if data.needs_alpha_update:
+				label.modulate.a = 1.0 - progress
 			
 			# Bounce when hitting "ground"
 			if label.position.y > data.start_pos.y:
@@ -310,14 +330,16 @@ func _update_animation(label: Label, data: Dictionary, progress: float, delta: f
 				randf_range(-shake_amount, shake_amount),
 				randf_range(-shake_amount, shake_amount)
 			)
-			label.modulate.a = 1.0 - progress
+			if data.needs_alpha_update:
+				label.modulate.a = 1.0 - progress
 		
 		AnimationStyle.SCALE_POP:
 			var scale_curve = sin(progress * PI)  # 0 -> 1 -> 0
 			var scale_factor = 1.0 + (scale_multiplier - 1.0) * scale_curve
 			label.scale = data.start_scale * scale_factor
 			label.position.y -= float_speed * 0.5 * delta
-			label.modulate.a = 1.0 - progress
+			if data.needs_alpha_update:
+				label.modulate.a = 1.0 - progress
 
 
 ## Internal: Finish and cleanup label
@@ -352,7 +374,7 @@ func set_spawn_parent(parent: Node) -> void:
 ## [param cleanup]: Whether to free the label nodes.
 func clear_all(cleanup: bool = true) -> void:
 	for data in _active_labels:
-		var label = data.label as Label
+		var label = data.label
 		if not is_instance_valid(label):
 			continue
 		
@@ -386,3 +408,8 @@ func configure_style(
 	use_outline = _use_outline
 	outline_color = _outline_color
 	outline_size = _outline_size
+
+
+## Internal: Update cached optimization values
+func _update_cached_values() -> void:
+	_inv_duration = 1.0 / duration if duration > 0.0 else 1.0
