@@ -302,7 +302,7 @@ func add_xp(amount: int, accumulate: bool = false) -> bool:
 ## Gets the XP required to reach the next level (complete the current level).[br]
 ## Returns 0 if the track is already at the maximum level.[br]
 ## [return]: The required XP defined in the [UpgradeLevelConfig] for the current target level, or 0 if max level reached.[br]
-func get_current_xp_required() -> int:
+func get_remaining_xp_to_level() -> int:
 	if not enable_infinite_levels and is_max_level():
 		return 0
 		
@@ -317,6 +317,18 @@ func get_current_xp_required() -> int:
 		
 	return max(0, required - current_xp)
 
+## Gets the required XP for the next level (complete the current level).
+func get_required_xp_for_next_level() -> int:
+	if not enable_infinite_levels and is_max_level():
+		return 0
+
+	if current_level >= level_configs.size():
+		var cfg = _generate_extrapolated_config(current_level + 1)
+		return cfg.xp_required
+
+	return level_configs[current_level].xp_required
+
+
 ## Gets the current level of the upgrade track.
 func get_current_level() -> int:
 	return current_level
@@ -325,7 +337,7 @@ func get_current_level() -> int:
 ## Returns 1.0 if the required XP is 0 (e.g., at max level or if config has 0 XP).[br]
 ## [return]: The progress ratio ([code]current_xp / required_xp[/code]), clamped between 0.0 and 1.0).[br]
 func get_progress_ratio() -> float:
-	var required = get_current_xp_required()
+	var required = get_required_xp_for_next_level()
 	return clamp(float(current_xp) / required, 0.0, 1.0) if required > 0 else 1.0
 
 ## Checks if the upgrade track can currently level up based on XP and material requirements.[br]
@@ -358,11 +370,11 @@ func can_upgrade(added_xp: int=0) -> bool:
 ## Levels up the upgrade track by adding the required XP and emitting the [signal upgrade_applied] signal.[br]
 ## Returns [code]true[/code] if the level up was successful, [code]false[/code] otherwise.[br]
 func level_up() -> bool:
-	if get_current_xp_required() == 0:
+	if get_remaining_xp_to_level() == 0:
 		if is_max_level():
 			return false		
 		return do_upgrade()
-	return add_xp(get_current_xp_required())
+	return add_xp(get_remaining_xp_to_level())
 
 ## Sets the level of the upgrade track.[br]
 ## Removes any previous modifiers and emits the [signal upgrade_removed] signal. Internal use.[br]
@@ -408,9 +420,6 @@ func do_upgrade(ignore_cost: bool = false) -> bool:
 	if not can_upgrade() and not ignore_cost:
 		printerr("Upgrade: do_upgrade called when can_upgrade is false.")
 		return false
-	if not is_instance_valid(_stat_owner):
-		printerr("Upgrade: Stat owner invalid during upgrade.")
-		return false
 
 	var config: UpgradeLevelConfig
 	if current_level >= level_configs.size():
@@ -419,6 +428,11 @@ func do_upgrade(ignore_cost: bool = false) -> bool:
 		config = _generate_extrapolated_config(current_level + 1)
 	else:
 		config = level_configs[current_level]
+	
+	# Stat owner is only required if this level actually has modifiers
+	if config.modifiers and not is_instance_valid(_stat_owner):
+		printerr("Upgrade: Stat owner invalid during upgrade.")
+		return false
 
 	# Check and optionally consume materials
 	if (_inventory and config.required_materials) and not ignore_cost:

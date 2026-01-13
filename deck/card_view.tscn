@@ -1,0 +1,179 @@
+[gd_scene format=3 uid="uid://dwmij006x7701"]
+
+[ext_resource type="Script" uid="uid://bm2qnc7ataemq" path="res://scripts/deck/card_view.gd" id="1_keigp"]
+[ext_resource type="Script" uid="uid://ctxcedos6k4fe" path="res://scripts/deck/flip_reveal_animation.gd" id="2_1twho"]
+[ext_resource type="Texture2D" uid="uid://c1xgwn2chet6s" path="res://icon.svg" id="2_3dad0"]
+[ext_resource type="Texture2D" uid="uid://1wbxja7jv3s3" path="res://test_assets/1768254782_rz.png" id="3_glgs8"]
+
+[sub_resource type="Resource" id="Resource_glgs8"]
+script = ExtResource("2_1twho")
+duration = 0.6
+metadata/_custom_type_script = "uid://ctxcedos6k4fe"
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_kjtrn"]
+texture = ExtResource("3_glgs8")
+axis_stretch_horizontal = 2
+axis_stretch_vertical = 2
+
+[sub_resource type="LabelSettings" id="LabelSettings_3dad0"]
+font_size = 18
+font_color = Color(0.7473272, 0.4807768, 0.19638166, 1)
+shadow_color = Color(0, 0, 0, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_glgs8"]
+content_margin_left = 6.0
+content_margin_top = 6.0
+content_margin_right = 6.0
+content_margin_bottom = 6.0
+bg_color = Color(0.60038817, 0.60038817, 0.60038817, 0.072000004)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.09239706, 0.09239709, 0.09239695, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+anti_aliasing = false
+anti_aliasing_size = 6.772
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_3dad0"]
+bg_color = Color(0.52168345, 0.34150264, 0.12258343, 1)
+border_blend = true
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="LabelSettings" id="LabelSettings_1twho"]
+font_color = Color(0.1148968, 0.11489681, 0.1148968, 1)
+outline_color = Color(0, 0, 0, 1)
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_glgs8"]
+texture = ExtResource("3_glgs8")
+
+[sub_resource type="LabelSettings" id="LabelSettings_glgs8"]
+font_size = 200
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_kjtrn"]
+bg_color = Color(0.7541437, 0.8042172, 1, 0.133)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.3393168, 0.4828691, 1, 1)
+border_blend = true
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1twho"]
+bg_color = Color(0, 0.6698492, 0.7921375, 0.043137256)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.7320617, 0.46659744, 0.06958117, 1)
+border_blend = true
+
+[node name="CardView" type="PanelContainer" unique_id=2095626895]
+custom_minimum_size = Vector2(200, 400)
+offset_right = 200.0
+offset_bottom = 400.0
+script = ExtResource("1_keigp")
+reveal_animation = SubResource("Resource_glgs8")
+
+[node name="CardFront" type="MarginContainer" parent="." unique_id=1163501574]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/margin_left = 4
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 4
+theme_override_constants/margin_bottom = 4
+
+[node name="FrontPanel" type="PanelContainer" parent="CardFront" unique_id=589508433]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxTexture_kjtrn")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CardFront/FrontPanel" unique_id=1954877886]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="CardFront/FrontPanel/VBoxContainer" unique_id=719199708]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Title"
+label_settings = SubResource("LabelSettings_3dad0")
+horizontal_alignment = 1
+
+[node name="Icon" type="TextureRect" parent="CardFront/FrontPanel/VBoxContainer" unique_id=1530548966]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(160, 160)
+layout_mode = 2
+size_flags_vertical = 6
+texture = ExtResource("2_3dad0")
+expand_mode = 3
+stretch_mode = 5
+
+[node name="Description" type="RichTextLabel" parent="CardFront/FrontPanel/VBoxContainer" unique_id=654474384]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+theme_override_font_sizes/normal_font_size = 14
+theme_override_font_sizes/bold_font_size = 14
+theme_override_font_sizes/bold_italics_font_size = 14
+theme_override_font_sizes/italics_font_size = 14
+theme_override_font_sizes/mono_font_size = 14
+theme_override_styles/normal = SubResource("StyleBoxFlat_glgs8")
+bbcode_enabled = true
+text = "Test Description
+"
+scroll_active = false
+
+[node name="Category" type="Label" parent="CardFront/FrontPanel/VBoxContainer" unique_id=241832200]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_3dad0")
+text = "Fire"
+label_settings = SubResource("LabelSettings_1twho")
+horizontal_alignment = 1
+
+[node name="CardBack" type="MarginContainer" parent="." unique_id=130487079]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Panel" type="Panel" parent="CardBack" unique_id=820047825]
+layout_mode = 2
+mouse_filter = 1
+theme_override_styles/panel = SubResource("StyleBoxTexture_glgs8")
+
+[node name="Label" type="Label" parent="CardBack/Panel" unique_id=335855165]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -11.5
+offset_right = 20.0
+offset_bottom = 11.5
+grow_horizontal = 2
+grow_vertical = 2
+text = "?"
+label_settings = SubResource("LabelSettings_glgs8")
+horizontal_alignment = 1
+
+[node name="FocusIndicator" type="Panel" parent="." unique_id=1570502643]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_kjtrn")
+
+[node name="SelectionIndicator" type="Panel" parent="." unique_id=1755749179]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_1twho")

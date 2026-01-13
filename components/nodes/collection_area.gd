@@ -23,7 +23,13 @@ enum CollectionMode {
 
 @export_group("Collection Settings")
 @export var collection_mode: CollectionMode = CollectionMode.MAGNETIC
+## Automatically collect items when they enter the collection trigger
 @export var auto_collect: bool = true
+## Range for collection trigger
+@export var collection_range: float = 100.0:
+	set(v):
+		collection_range = v
+		_update_collision_shape(collection_range)
 
 ## Group name for screen-wide collection
 @export var item_group_name: String = "collectible"
@@ -149,6 +155,11 @@ func _setup_detection_area() -> void:
 	detection_area.target_lost.connect(_on_item_lost)
 
 func _setup_collection_trigger() -> void:
+	for child in get_children():
+		if child is CollisionShape2D:
+			collision_shape = child
+
+	_update_collision_shape(collection_range)
 	if set_collision_flags:
 		collision_layer = target_collision_layer
 		collision_mask = target_collision_mask
@@ -169,6 +180,9 @@ func _setup_collection_trigger() -> void:
 	
 	body_exited.connect(_on_collection_trigger_exited)
 	area_exited.connect(_on_collection_trigger_exited)
+	
+	# Scan for items already overlapping after setup
+	call_deferred("_scan_overlapping_items")
 
 func _process(delta: float) -> void:
 	if Engine.is_editor_hint():
@@ -394,6 +408,16 @@ func _on_collection_trigger_entered(item: Node) -> void:
 func _on_collection_trigger_exited(item: Node) -> void:
 	collectible_items.erase(item)
 
+## Scan for items already overlapping the collection trigger
+func _scan_overlapping_items() -> void:
+	# Check overlapping bodies
+	for body in get_overlapping_bodies():
+		_on_collection_trigger_entered(body)
+	
+	# Check overlapping areas
+	for area in get_overlapping_areas():
+		_on_collection_trigger_entered(area)
+
 ## Utility functions
 func _get_item_type(item: Node) -> String:
 	if "item_type" in item:
@@ -444,19 +468,18 @@ func get_collectible_items() -> Array[Node2D]:
 func _update_collision_shape(range_value: float) -> void:
 	if not collision_shape or not collision_shape.shape:
 		return
+
+	var scaled_range := range_value
+	var shape = collision_shape.shape
+
+	if shape is CapsuleShape2D:
+		shape.radius = scaled_range
+		shape.height = scaled_range * 2
+	elif shape is CircleShape2D:
+		shape.radius = scaled_range
+	elif shape is RectangleShape2D:
+		shape.size = Vector2(scaled_range * 2, scaled_range * 2)
 	
-	var scaled_range = range_value
-	
-	match collision_shape.shape_type:
-		"circle":
-			var circle = collision_shape.shape as CircleShape2D
-			circle.radius = scaled_range
-		
-		"rectangle":
-			var rect = collision_shape.shape as RectangleShape2D
-			rect.size = Vector2(scaled_range * 2, scaled_range * 2)
-		
-		"capsule":
-			var capsule = collision_shape.shape as CapsuleShape2D
-			capsule.radius = scaled_range
-			capsule.height = scaled_range * 2
+	# Rescan for overlapping items after shape change (runtime updates)
+	if is_inside_tree():
+		call_deferred("_scan_overlapping_items")
